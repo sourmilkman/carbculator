@@ -81,11 +81,15 @@
             <input id="portionGrams" inputmode="decimal" type="number" step="0.1" placeholder="0" />
           </label>
           <label class="field">
-            Carbs per piece (optional)
-            <input id="carbsPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            Total pieces in product (optional)
+            <input id="totalPieces" inputmode="numeric" type="number" step="1" placeholder="e.g. 8" />
           </label>
           <label class="field">
-            Pieces eaten
+            Carbs per piece (override, optional)
+            <input id="carbsPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="auto" />
+          </label>
+          <label class="field full">
+            Pieces consumed
             <input id="pieces" inputmode="decimal" type="number" step="0.5" placeholder="0" />
           </label>
           <label class="field">

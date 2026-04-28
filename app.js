@@ -22,7 +22,7 @@ const els = {
   barcode: $('barcode'), productName: $('productName'),
   gramsConsumed: $('gramsConsumed'), carbsPer100: $('carbsPer100'),
   carbsPerPortion: $('carbsPerPortion'), portionGrams: $('portionGrams'),
-  carbsPerPiece: $('carbsPerPiece'), pieces: $('pieces'),
+  carbsPerPiece: $('carbsPerPiece'), pieces: $('pieces'), totalPieces: $('totalPieces'),
   notes: $('notes'),
   addEntry: $('addEntry'), nutritionPhoto: $('nutritionPhoto'),
   scanResult: $('scanResult'), carbPreview: $('carbPreview'),
@@ -46,14 +46,27 @@ function toast(msg, ms = 1800) {
   toast._t = setTimeout(() => els.toast.classList.add('hidden'), ms);
 }
 
-function calcCarbs({ grams, carbsPer100, carbsPerPortion, portionGrams, carbsPerPiece, pieces }) {
-  grams = Number(grams) || 0;
-  pieces = Number(pieces) || 0;
-  carbsPerPiece = Number(carbsPerPiece) || 0;
-  if (pieces > 0 && carbsPerPiece > 0) return pieces * carbsPerPiece;
-  if (Number(carbsPer100) > 0 && grams > 0) return (grams / 100) * Number(carbsPer100);
-  if (Number(carbsPerPortion) > 0 && Number(portionGrams) > 0 && grams > 0)
-    return (grams / Number(portionGrams)) * Number(carbsPerPortion);
+function derivePerPiece({ carbsPerPiece, carbsPerPortion, portionGrams, carbsPer100, totalPieces }) {
+  const manual = Number(carbsPerPiece) || 0;
+  if (manual > 0) return manual;
+  const tp = Number(totalPieces) || 0;
+  if (tp <= 0) return 0;
+  const cpp = Number(carbsPerPortion) || 0;
+  if (cpp > 0) return cpp / tp;
+  const pg = Number(portionGrams) || 0;
+  const c100 = Number(carbsPer100) || 0;
+  if (pg > 0 && c100 > 0) return (pg * c100 / 100) / tp;
+  return 0;
+}
+
+function calcCarbs(f) {
+  const grams = Number(f.grams) || 0;
+  const pieces = Number(f.pieces) || 0;
+  const perPiece = derivePerPiece(f);
+  if (pieces > 0 && perPiece > 0) return pieces * perPiece;
+  if (Number(f.carbsPer100) > 0 && grams > 0) return (grams / 100) * Number(f.carbsPer100);
+  if (Number(f.carbsPerPortion) > 0 && Number(f.portionGrams) > 0 && grams > 0)
+    return (grams / Number(f.portionGrams)) * Number(f.carbsPerPortion);
   return 0;
 }
 
@@ -67,13 +80,14 @@ function readForm() {
     portionGrams: Number(els.portionGrams.value || 0),
     carbsPerPiece: Number(els.carbsPerPiece.value || 0),
     pieces: Number(els.pieces.value || 0),
+    totalPieces: Number(els.totalPieces.value || 0),
     notes: els.notes.value.trim(),
   };
 }
 
 function clearForm() {
   ['barcode', 'productName', 'gramsConsumed', 'carbsPer100',
-   'carbsPerPortion', 'portionGrams', 'carbsPerPiece', 'pieces', 'notes']
+   'carbsPerPortion', 'portionGrams', 'carbsPerPiece', 'pieces', 'totalPieces', 'notes']
     .forEach((k) => (els[k].value = ''));
   els.scanResult.textContent = 'Scan a barcode — saved products auto-fill. New ones look up Open Food Facts.';
   updatePreview();
@@ -86,6 +100,7 @@ function applyProduct(p) {
   if (p.carbsPerPortion) els.carbsPerPortion.value = String(p.carbsPerPortion);
   if (p.portionGrams) els.portionGrams.value = String(p.portionGrams);
   if (p.carbsPerPiece) els.carbsPerPiece.value = String(p.carbsPerPiece);
+  if (p.totalPieces) els.totalPieces.value = String(p.totalPieces);
   updatePreview();
 }
 
@@ -96,8 +111,19 @@ function applyTheme() {
 }
 
 function updatePreview() {
-  const c = calcCarbs(readForm());
-  els.carbPreview.textContent = `${c.toFixed(1)}g carbs for this entry`;
+  const f = readForm();
+  const c = calcCarbs(f);
+  const perPiece = derivePerPiece(f);
+  let txt = `${c.toFixed(1)}g carbs for this entry`;
+  if (perPiece > 0) {
+    txt += ` · each piece ≈ ${perPiece.toFixed(2)}g`;
+    const remaining = state.limit - dailyTotal();
+    if (perPiece > 0 && remaining > 0) {
+      const safe = Math.floor(remaining / perPiece);
+      txt += ` · ${safe} piece${safe === 1 ? '' : 's'} left within today's limit`;
+    }
+  }
+  els.carbPreview.textContent = txt;
 }
 
 function dailyTotal(date = today()) {
@@ -245,6 +271,7 @@ function addEntry() {
       carbsPerPortion: f.carbsPerPortion,
       portionGrams: f.portionGrams,
       carbsPerPiece: f.carbsPerPiece,
+      totalPieces: f.totalPieces,
       lastUsed: Date.now(),
     };
   }
@@ -543,7 +570,7 @@ els.syncDrive.addEventListener('click', () => syncToDrive({ interactive: !state.
 els.scanBarcode.addEventListener('click', openScanner);
 els.closeScanner.addEventListener('click', closeScanner);
 
-['carbsPer100', 'carbsPerPortion', 'portionGrams', 'gramsConsumed', 'carbsPerPiece', 'pieces'].forEach((k) => {
+['carbsPer100', 'carbsPerPortion', 'portionGrams', 'gramsConsumed', 'carbsPerPiece', 'pieces', 'totalPieces'].forEach((k) => {
   els[k].addEventListener('input', updatePreview);
 });
 els.barcode.addEventListener('change', () => {
@@ -566,9 +593,10 @@ document.querySelectorAll('[data-portion]').forEach((b) => {
 document.querySelectorAll('[data-pieces]').forEach((b) => {
   b.addEventListener('click', () => {
     els.pieces.value = b.dataset.pieces;
-    if (!Number(els.carbsPerPiece.value)) {
-      toast('Set carbs per piece for this product.');
-      els.carbsPerPiece.focus();
+    const perPiece = derivePerPiece(readForm());
+    if (perPiece <= 0) {
+      toast('Add total pieces (or carbs per piece) so I can calculate.');
+      els.totalPieces.focus();
     }
     updatePreview();
   });
