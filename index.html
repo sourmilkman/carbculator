@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Carbculator</title>
+    <meta name="theme-color" content="#111827" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="card hero">
+        <div>
+          <p class="eyebrow">Daily net carbs</p>
+          <h1 id="dailyTotal">0.0g</h1>
+          <p id="dailyStatus" class="status-pill">Within limit</p>
+        </div>
+        <div class="limit-wrap">
+          <label for="limitRange">Daily limit: <span id="limitLabel">30g</span></label>
+          <input id="limitRange" type="range" min="0" max="50" step="1" value="30" />
+        </div>
+      </header>
+
+      <section class="card">
+        <h2>Add food or drink</h2>
+        <div class="grid-two">
+          <label class="field">
+            Barcode (optional)
+            <div class="barcode-row">
+              <input id="barcode" type="text" inputmode="numeric" placeholder="Scan or enter barcode" />
+              <button id="scanBarcode" class="btn" type="button">Scan barcode</button>
+            </div>
+            <small id="barcodeStatus" class="subtle"></small>
+          </label>
+          <label class="field">
+            Product name
+            <input id="productName" list="productOptions" type="text" placeholder="e.g. Aldi Macadamia Nuts" />
+            <datalist id="productOptions"></datalist>
+          </label>
+          <label class="field">
+            Grams consumed
+            <div class="grams-row">
+              <input id="gramsConsumed" inputmode="decimal" type="text" placeholder="0" readonly />
+              <button id="openKeyboard" class="btn ghost" type="button">Keyboard</button>
+            </div>
+          </label>
+          <label class="field">
+            Carbs per 100g
+            <input id="carbsPer100" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+          </label>
+          <label class="field">
+            Carbs per portion (optional)
+            <input id="carbsPerPortion" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+          </label>
+          <label class="field">
+            Portion grams (optional)
+            <input id="portionGrams" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+          </label>
+          <label class="field">
+            Notes
+            <input id="notes" type="text" placeholder="Anything important" />
+          </label>
+        </div>
+
+        <div class="action-row">
+          <label class="btn" for="nutritionPhoto">📷 Scan nutrition label</label>
+          <input id="nutritionPhoto" type="file" accept="image/*" capture="environment" hidden />
+          <button id="addEntry" class="btn primary" type="button">Add to daily total</button>
+          <button id="cancelEdit" class="btn ghost hidden" type="button">Cancel edit</button>
+        </div>
+        <p id="scanResult" class="subtle"></p>
+
+        <div id="barcodeScannerWrap" class="scanner-wrap hidden">
+          <video id="barcodeVideo" autoplay playsinline muted></video>
+          <button id="stopBarcodeScan" class="btn ghost" type="button">Stop scan</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row-between">
+          <h2>Today’s entries</h2>
+          <button id="syncDrive" type="button" class="btn">Sync Google Drive</button>
+        </div>
+        <p class="subtle">All entries are stored locally and synced into one JSON file in your Drive.</p>
+        <ul id="entriesList" class="entries"></ul>
+      </section>
+
+      <section class="card settings">
+        <div class="row-between">
+          <h2>Google Drive setup</h2>
+          <button id="installApp" class="btn ghost hidden" type="button">Install app</button>
+        </div>
+        <label class="field">
+          Google OAuth Client ID
+          <input id="googleClientId" type="text" placeholder="Paste your OAuth Client ID" />
+        </label>
+        <p class="subtle">Use a Web OAuth client with Drive File scope enabled in Google Cloud.</p>
+        <p id="driveLoadStatus" class="subtle"></p>
+      </section>
+    </main>
+
+    <section id="keyboardSheet" class="keyboard-sheet hidden" aria-hidden="true">
+      <div class="keyboard-grid" id="keyboardGrid"></div>
+      <button id="closeKeyboard" class="btn ghost" type="button">Close</button>
+    </section>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
