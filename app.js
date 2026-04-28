@@ -1,14 +1,18 @@
 const GOOGLE_CLIENT_ID = '1629709103-c7ltm86t4lbiaaqi7igedtsadjosqrdj.apps.googleusercontent.com';
+const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 
 const state = {
   entries: [],
   limit: Number(localStorage.getItem('carbLimit') || 30),
   driveFileId: localStorage.getItem('driveFileId') || '',
+  theme: localStorage.getItem('carbTheme') || (prefersDark ? 'dark' : 'light'),
 };
 
 const els = {
   dailyTotal: document.getElementById('dailyTotal'),
   dailyStatus: document.getElementById('dailyStatus'),
+  themeToggle: document.getElementById('themeToggle'),
+  themeToggleLabel: document.getElementById('themeToggleLabel'),
   limitRange: document.getElementById('limitRange'),
   limitLabel: document.getElementById('limitLabel'),
   limitMeter: document.getElementById('limitMeter'),
@@ -35,6 +39,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 function load() {
   state.entries = JSON.parse(localStorage.getItem('carbEntries') || '[]');
   els.limitRange.value = String(state.limit);
+  applyTheme();
   render();
 }
 
@@ -46,6 +51,34 @@ function calcCarbs({ grams, carbsPer100, carbsPerPortion, portionGrams }) {
   if (carbsPer100 > 0) return (grams / 100) * carbsPer100;
   if (carbsPerPortion > 0 && portionGrams > 0) return (grams / portionGrams) * carbsPerPortion;
   return 0;
+}
+
+function parseDecimal(value) {
+  return Number(value.replace(',', '.'));
+}
+
+function extractCarbsPer100(rawText) {
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  const patterns = [
+    /carbohydrate[s]?[^\d]{0,40}(\d+[\.,]?\d*)\s*g[^\d]{0,40}(?:per\s*)?100\s*g/i,
+    /(?:per\s*)?100\s*g[^\d]{0,60}carbohydrate[s]?[^\d]{0,40}(\d+[\.,]?\d*)\s*g/i,
+    /carbohydrate[s]?[^\d]{0,40}(\d+[\.,]?\d*)\s*g/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const value = parseDecimal(match[1]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+
+  return 0;
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  els.themeToggle.checked = state.theme === 'dark';
+  els.themeToggleLabel.textContent = state.theme === 'dark' ? 'Light mode' : 'Dark mode';
 }
 
 function render() {
@@ -116,19 +149,7 @@ async function scanNutrition(file) {
   els.scanResult.textContent = 'Reading label...';
   try {
     const result = await Tesseract.recognize(file, 'eng');
-    const text = result.data.text.replace(/\s+/g, ' ');
-
-    const per100Match =
-      text.match(/carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g[^\d]{0,20}(100\s*g|per\s*100)/i) ||
-      text.match(/(100\s*g|per\s*100)[^\d]{0,30}carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g/i);
-
-    const anyCarbMatch = text.match(/carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g/i);
-
-    const per100Value = per100Match
-      ? Number((per100Match[1] || per100Match[2]).replace(',', '.'))
-      : anyCarbMatch
-        ? Number(anyCarbMatch[1].replace(',', '.'))
-        : 0;
+    const per100Value = extractCarbsPer100(result.data.text);
 
     if (per100Value > 0) {
       els.carbsPer100.value = String(per100Value);
@@ -247,6 +268,11 @@ els.limitRange.addEventListener('input', () => {
   state.limit = Number(els.limitRange.value);
   localStorage.setItem('carbLimit', String(state.limit));
   render();
+});
+els.themeToggle.addEventListener('change', () => {
+  state.theme = els.themeToggle.checked ? 'dark' : 'light';
+  localStorage.setItem('carbTheme', state.theme);
+  applyTheme();
 });
 els.addEntry.addEventListener('click', addEntry);
 els.nutritionPhoto.addEventListener('change', (e) => {
