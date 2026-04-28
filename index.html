@@ -77,6 +77,14 @@
             <input id="portionGrams" inputmode="decimal" type="number" step="0.1" placeholder="0" />
           </label>
           <label class="field">
+            Carbs per piece (optional)
+            <input id="carbsPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+          </label>
+          <label class="field">
+            Pieces eaten
+            <input id="pieces" inputmode="decimal" type="number" step="0.5" placeholder="0" />
+          </label>
+          <label class="field">
             Grams consumed
             <input id="gramsConsumed" inputmode="decimal" type="number" step="0.1" placeholder="0" />
           </label>
@@ -91,6 +99,13 @@
           <button class="chip" type="button" data-portion="0.5">½ portion</button>
           <button class="chip" type="button" data-portion="1">1 portion</button>
           <button class="chip" type="button" data-portion="2">2 portions</button>
+        </div>
+        <div class="quick-row">
+          <span class="quick-label">Quick pieces:</span>
+          <button class="chip" type="button" data-pieces="1">1 piece</button>
+          <button class="chip" type="button" data-pieces="2">2 pieces</button>
+          <button class="chip" type="button" data-pieces="5">5 pieces</button>
+          <button class="chip" type="button" data-pieces="10">10 pieces</button>
         </div>
 
         <p id="carbPreview" class="preview">0.0g carbs for this entry</p>
