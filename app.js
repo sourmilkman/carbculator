@@ -1,3 +1,5 @@
+const GOOGLE_CLIENT_ID = '1629709103-c7ltm86t4lbiaaqi7igedtsadjosqrdj.apps.googleusercontent.com';
+
 const state = {
   entries: [],
   limit: Number(localStorage.getItem('carbLimit') || 30),
@@ -22,7 +24,6 @@ const els = {
   scanResult: document.getElementById('scanResult'),
   entriesList: document.getElementById('entriesList'),
   syncDrive: document.getElementById('syncDrive'),
-  googleClientId: document.getElementById('googleClientId'),
   openKeyboard: document.getElementById('openKeyboard'),
   closeKeyboard: document.getElementById('closeKeyboard'),
   keyboardSheet: document.getElementById('keyboardSheet'),
@@ -33,7 +34,6 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 function load() {
   state.entries = JSON.parse(localStorage.getItem('carbEntries') || '[]');
-  els.googleClientId.value = localStorage.getItem('googleClientId') || '';
   els.limitRange.value = String(state.limit);
   render();
 }
@@ -166,13 +166,9 @@ function openKeyboard(open) {
 
 let tokenClient;
 async function getToken() {
-  const clientId = els.googleClientId.value.trim();
-  if (!clientId) throw new Error('Add Google OAuth Client ID first.');
-  localStorage.setItem('googleClientId', clientId);
-
   return new Promise((resolve, reject) => {
     tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
+      client_id: GOOGLE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/drive.file',
       callback: (resp) => {
         if (resp.error) reject(resp);
