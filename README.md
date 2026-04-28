@@ -47,7 +47,3 @@ Scope used: `https://www.googleapis.com/auth/drive.file`.
 Push this repo to your GitHub repository and deploy via GitHub Pages, Netlify, or Vercel.
 
 For GitHub Pages, keep it as static files at root.
-
-### If UI looks unstyled on GitHub Pages
-
-This app uses relative asset paths so it works under project subpaths (e.g. `/carbculator/`). If styles still look missing after deploy, hard-refresh and clear old service worker caches.
