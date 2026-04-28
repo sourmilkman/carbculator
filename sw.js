@@ -1,12 +1,12 @@
-const CACHE = 'carbculator-v2';
+const CACHE = 'carbculator-v3';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/manifest.webmanifest',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  './',
+  'index.html',
+  'styles.css',
+  'app.js',
+  'manifest.webmanifest',
+  'icons/icon-192.svg',
+  'icons/icon-512.svg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -15,6 +15,6 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => caches.match('/index.html'))),
+    caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => caches.match('index.html'))),
   );
 });

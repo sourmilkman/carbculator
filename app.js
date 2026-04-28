@@ -9,6 +9,8 @@ const els = {
   dailyStatus: document.getElementById('dailyStatus'),
   limitRange: document.getElementById('limitRange'),
   limitLabel: document.getElementById('limitLabel'),
+  limitMeter: document.getElementById('limitMeter'),
+  limitHint: document.getElementById('limitHint'),
   productName: document.getElementById('productName'),
   gramsConsumed: document.getElementById('gramsConsumed'),
   carbsPer100: document.getElementById('carbsPer100'),
@@ -48,20 +50,28 @@ function calcCarbs({ grams, carbsPer100, carbsPerPortion, portionGrams }) {
 
 function render() {
   const total = state.entries.filter((e) => e.date === today()).reduce((sum, e) => sum + e.carbs, 0);
-  els.dailyTotal.textContent = `${total.toFixed(1)}g`;
   const ratio = state.limit === 0 ? 1 : total / state.limit;
+  const meterPercent = state.limit === 0 ? 100 : Math.min(100, Math.max(0, ratio * 100));
+
+  els.dailyTotal.textContent = `${total.toFixed(1)}g`;
+  els.limitLabel.textContent = `${state.limit}g`;
+  els.limitMeter.style.width = `${meterPercent}%`;
+  const remaining = state.limit - total;
+  els.limitHint.textContent =
+    remaining >= 0 ? `${remaining.toFixed(1)}g remaining today` : `${Math.abs(remaining).toFixed(1)}g over today`;
+
   if (total > state.limit) {
     els.dailyStatus.textContent = 'Exceeded limit';
-    els.dailyStatus.style.background = '#4a1418';
-    els.dailyStatus.style.color = '#ffb9c0';
+    els.dailyStatus.style.background = 'rgba(194, 65, 60, 0.22)';
+    els.dailyStatus.style.color = '#ffd7d4';
   } else if (ratio >= 0.8) {
     els.dailyStatus.textContent = 'Near limit';
-    els.dailyStatus.style.background = '#4b390f';
-    els.dailyStatus.style.color = '#ffd88f';
+    els.dailyStatus.style.background = 'rgba(217, 154, 43, 0.24)';
+    els.dailyStatus.style.color = '#ffe0a3';
   } else {
     els.dailyStatus.textContent = 'Within limit';
-    els.dailyStatus.style.background = '#123825';
-    els.dailyStatus.style.color = '#8cf6c5';
+    els.dailyStatus.style.background = 'rgba(223, 241, 238, 0.16)';
+    els.dailyStatus.style.color = '#b9f2e8';
   }
 
   els.entriesList.innerHTML = '';
@@ -71,11 +81,9 @@ function render() {
     .reverse()
     .forEach((entry) => {
       const li = document.createElement('li');
-      li.innerHTML = `<div><strong>${entry.name || 'Unnamed item'}</strong><small>${entry.grams}g • ${entry.date}</small></div><div>${entry.carbs.toFixed(1)}g carbs</div>`;
+      li.innerHTML = `<div><strong>${entry.name || 'Unnamed item'}</strong><small>${entry.grams}g | ${entry.date}</small></div><div>${entry.carbs.toFixed(1)}g carbs</div>`;
       els.entriesList.appendChild(li);
     });
-
-  els.limitLabel.textContent = `${state.limit}g`;
 }
 
 function addEntry() {
@@ -99,8 +107,8 @@ function addEntry() {
   saveLocal();
   render();
 
-  ['productName', 'gramsConsumed', 'carbsPer100', 'carbsPerPortion', 'portionGrams', 'notes'].forEach((k) => {
-    els[k].value = '';
+  ['productName', 'gramsConsumed', 'carbsPer100', 'carbsPerPortion', 'portionGrams', 'notes'].forEach((key) => {
+    els[key].value = '';
   });
 }
 
@@ -110,7 +118,8 @@ async function scanNutrition(file) {
     const result = await Tesseract.recognize(file, 'eng');
     const text = result.data.text.replace(/\s+/g, ' ');
 
-    const per100Match = text.match(/carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g[^\d]{0,20}(100\s*g|per\s*100)/i) ||
+    const per100Match =
+      text.match(/carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g[^\d]{0,20}(100\s*g|per\s*100)/i) ||
       text.match(/(100\s*g|per\s*100)[^\d]{0,30}carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g/i);
 
     const anyCarbMatch = text.match(/carbohydrate[s]?[^\d]*(\d+[\.,]?\d*)\s*g/i);
@@ -118,12 +127,12 @@ async function scanNutrition(file) {
     const per100Value = per100Match
       ? Number((per100Match[1] || per100Match[2]).replace(',', '.'))
       : anyCarbMatch
-      ? Number(anyCarbMatch[1].replace(',', '.'))
-      : 0;
+        ? Number(anyCarbMatch[1].replace(',', '.'))
+        : 0;
 
     if (per100Value > 0) {
       els.carbsPer100.value = String(per100Value);
-      els.scanResult.textContent = `Detected ≈ ${per100Value}g carbs per 100g. Please verify.`;
+      els.scanResult.textContent = `Detected about ${per100Value}g carbs per 100g. Please verify.`;
     } else {
       els.scanResult.textContent = 'Could not confidently read carbs. Please enter manually.';
     }
@@ -133,13 +142,13 @@ async function scanNutrition(file) {
 }
 
 function buildKeyboard() {
-  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'Back'];
   keys.forEach((key) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = key;
     btn.addEventListener('click', () => {
-      if (key === '⌫') {
+      if (key === 'Back') {
         els.gramsConsumed.value = els.gramsConsumed.value.slice(0, -1);
         return;
       }
@@ -228,7 +237,7 @@ async function syncToDrive() {
       },
       body: JSON.stringify({ entries: state.entries, updatedAt: new Date().toISOString() }),
     });
-    els.syncDrive.textContent = 'Synced ✓';
+    els.syncDrive.textContent = 'Synced';
     setTimeout(() => (els.syncDrive.textContent = 'Sync Google Drive'), 1500);
   } catch (err) {
     alert(`Drive sync failed: ${err.message || 'Unknown error'}`);
@@ -253,7 +262,7 @@ els.openKeyboard.addEventListener('click', () => openKeyboard(true));
 els.closeKeyboard.addEventListener('click', () => openKeyboard(false));
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js');
+  navigator.serviceWorker.register('sw.js');
 }
 
 buildKeyboard();
