@@ -51,7 +51,11 @@
       <section class="card tab-panel" data-panel="add">
         <div class="row-between">
           <h2>Add food or drink</h2>
-          <button id="scanBarcode" class="btn primary" type="button">Scan barcode</button>
+          <div class="scan-buttons">
+            <button id="scanBarcode" class="btn primary" type="button">Scan barcode</button>
+            <label class="btn" for="nutritionPhoto">Scan nutrition label (OCR)</label>
+            <input id="nutritionPhoto" type="file" accept="image/*" capture="environment" hidden />
+          </div>
         </div>
         <p id="scanResult" class="subtle">Scan a barcode — saved products auto-fill. New ones look up Open Food Facts.</p>
 
@@ -111,8 +115,6 @@
         <p id="carbPreview" class="preview">0.0g carbs for this entry</p>
 
         <div class="action-row">
-          <label class="btn" for="nutritionPhoto">Scan nutrition label (OCR)</label>
-          <input id="nutritionPhoto" type="file" accept="image/*" capture="environment" hidden />
           <button id="addEntry" class="btn primary" type="button">Add to daily total</button>
         </div>
       </section>

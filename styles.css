@@ -284,6 +284,12 @@ input:focus, .search:focus {
   margin-top: 16px;
 }
 
+.scan-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .quick-row {
   display: flex;
   align-items: center;
