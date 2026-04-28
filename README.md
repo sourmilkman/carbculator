@@ -15,12 +15,6 @@ A mobile-first Progressive Web App for tracking daily carbohydrate intake from f
 - Custom bottom keyboard sheet for grams input (roughly half-screen on mobile).
 - PWA installable experience with offline caching and bundled local app icons (SVG, 192/512 variants).
 - Save everything locally and sync all entries into one Google Drive JSON file (`carbculator_entries.json`).
-- Product memory: saved entries become reusable product suggestions in the Product name dropdown.
-- On app launch, the app attempts to read your Drive JSON file and preload known products into that dropdown.
-- Edit and delete existing entries (with Drive sync updates).
-- Barcode-first flow: scan barcode once, fill nutrition manually, then auto-fill carb info on future scans of the same barcode (grams consumed remains manual).
-- Carb values are rounded and displayed to one decimal place.
-- Includes install prompt support for PWA installation on mobile.
 
 ## Run locally
 

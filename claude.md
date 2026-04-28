@@ -1,0 +1,5 @@
+https://github.com/sourmilkman/carbculator
+
+https://sourmilkman.github.io/carbculator/
+
+It's essentially an installable PWA app I want to use on my phone for tracking my carb intake each day to help with my keto diet. I can start by scanning a barcode of a product, then manually entering the details of the carbohydrates per 100 g and carbohydrates per portion. When I press a sync button, the app then syncs this data with a Google Drive spreadsheet in a JSON file. I also add in the consumed grams, which the app then calculates how many grams I have actually consumed of carbohydrates so far that day. It totals it up over all the things I have eaten and added. There's a traffic light system of how much I have approached my maximum number of carbs, which I have allocated using a slider at the top of the app. Once I have already scanned the barcode and entered the data, the app will then recognise the next time I scan the barcode and pull up that data linked to that barcode from the Google Docs sheet that I have synced in the past. It will fill in the relevant fields in the app form. 

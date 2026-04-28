@@ -4,54 +4,65 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Carbculator</title>
-    <meta name="theme-color" content="#111827" />
+    <meta name="theme-color" content="#121826" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.svg" />
     <link rel="apple-touch-icon" href="icons/icon-192.svg" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/icons/icon-192.svg" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
-    <link rel="stylesheet" href="/styles.css" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
   </head>
   <body>
     <main class="app-shell">
-      <header class="card hero">
-        <div>
+      <header class="hero">
+        <label class="theme-toggle">
+          <input id="themeToggle" type="checkbox" />
+          <span class="toggle-track" aria-hidden="true">
+            <span class="toggle-thumb"></span>
+          </span>
+          <span id="themeToggleLabel">Dark mode</span>
+        </label>
+        <div class="hero-copy">
           <p class="eyebrow">Daily net carbs</p>
           <h1 id="dailyTotal">0.0g</h1>
           <p id="dailyStatus" class="status-pill">Within limit</p>
         </div>
         <div class="limit-wrap">
-          <label for="limitRange">Daily limit: <span id="limitLabel">30g</span></label>
-          <input id="limitRange" type="range" min="0" max="50" step="1" value="30" />
+          <div class="limit-heading">
+            <label for="limitRange">Daily limit</label>
+            <strong id="limitLabel">30g</strong>
+          </div>
+          <input id="limitRange" type="range" min="0" max="100" step="1" value="30" />
+          <div class="meter" aria-hidden="true">
+            <span id="limitMeter"></span>
+          </div>
+          <p id="limitHint" class="limit-hint">30g remaining today</p>
         </div>
       </header>
 
-      <section class="card">
-        <h2>Add food or drink</h2>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="add" type="button">Add</button>
+        <button class="tab" data-tab="today" type="button">Today</button>
+        <button class="tab" data-tab="library" type="button">Library</button>
+        <button class="tab" data-tab="history" type="button">History</button>
+      </nav>
+
+      <section class="card tab-panel" data-panel="add">
+        <div class="row-between">
+          <h2>Add food or drink</h2>
+          <button id="scanBarcode" class="btn primary" type="button">Scan barcode</button>
+        </div>
+        <p id="scanResult" class="subtle">Scan a barcode — saved products auto-fill. New ones look up Open Food Facts.</p>
+
         <div class="grid-two">
           <label class="field">
-            Barcode (optional)
-            <div class="barcode-row">
-              <input id="barcode" type="text" inputmode="numeric" placeholder="Scan or enter barcode" />
-              <button id="scanBarcode" class="btn" type="button">Scan barcode</button>
-            </div>
-            <small id="barcodeStatus" class="subtle"></small>
+            Barcode
+            <input id="barcode" inputmode="numeric" type="text" placeholder="e.g. 5012345678900" />
           </label>
           <label class="field">
             Product name
-            <input id="productName" list="productOptions" type="text" placeholder="e.g. Aldi Macadamia Nuts" />
-            <datalist id="productOptions"></datalist>
-          </label>
-          <label class="field">
-            Grams consumed
-            <div class="grams-row">
-              <input id="gramsConsumed" inputmode="decimal" type="text" placeholder="0" readonly />
-              <button id="openKeyboard" class="btn ghost" type="button">Keyboard</button>
-            </div>
+            <input id="productName" type="text" placeholder="e.g. Greek Yogurt" />
           </label>
           <label class="field">
             Carbs per 100g
@@ -66,54 +77,65 @@
             <input id="portionGrams" inputmode="decimal" type="number" step="0.1" placeholder="0" />
           </label>
           <label class="field">
+            Grams consumed
+            <input id="gramsConsumed" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+          </label>
+          <label class="field full">
             Notes
             <input id="notes" type="text" placeholder="Anything important" />
           </label>
         </div>
 
+        <div class="quick-row">
+          <span class="quick-label">Quick portions:</span>
+          <button class="chip" type="button" data-portion="0.5">½ portion</button>
+          <button class="chip" type="button" data-portion="1">1 portion</button>
+          <button class="chip" type="button" data-portion="2">2 portions</button>
+        </div>
+
+        <p id="carbPreview" class="preview">0.0g carbs for this entry</p>
+
         <div class="action-row">
-          <label class="btn" for="nutritionPhoto">📷 Scan nutrition label</label>
+          <label class="btn" for="nutritionPhoto">Scan nutrition label (OCR)</label>
           <input id="nutritionPhoto" type="file" accept="image/*" capture="environment" hidden />
           <button id="addEntry" class="btn primary" type="button">Add to daily total</button>
-          <button id="cancelEdit" class="btn ghost hidden" type="button">Cancel edit</button>
-        </div>
-        <p id="scanResult" class="subtle"></p>
-
-        <div id="barcodeScannerWrap" class="scanner-wrap hidden">
-          <video id="barcodeVideo" autoplay playsinline muted></video>
-          <button id="stopBarcodeScan" class="btn ghost" type="button">Stop scan</button>
         </div>
       </section>
 
-      <section class="card">
+      <section class="card tab-panel hidden" data-panel="today">
         <div class="row-between">
-          <h2>Today’s entries</h2>
-          <button id="syncDrive" type="button" class="btn">Sync Google Drive</button>
+          <h2>Today's entries</h2>
+          <button id="syncDrive" type="button" class="btn">Sync Drive</button>
         </div>
-        <p class="subtle">All entries are stored locally and synced into one JSON file in your Drive.</p>
+        <p id="syncStatus" class="subtle">Auto-syncs after every change once you've signed in.</p>
         <ul id="entriesList" class="entries"></ul>
       </section>
 
-      <section class="card settings">
+      <section class="card tab-panel hidden" data-panel="library">
         <div class="row-between">
-          <h2>Google Drive setup</h2>
-          <button id="installApp" class="btn ghost hidden" type="button">Install app</button>
+          <h2>Product library</h2>
+          <input id="librarySearch" type="search" placeholder="Search…" class="search" />
         </div>
-        <label class="field">
-          Google OAuth Client ID
-          <input id="googleClientId" type="text" placeholder="Paste your OAuth Client ID" />
-        </label>
-        <p class="subtle">Use a Web OAuth client with Drive File scope enabled in Google Cloud.</p>
-        <p id="driveLoadStatus" class="subtle"></p>
+        <p class="subtle">Tap a product to log it again.</p>
+        <ul id="libraryList" class="entries"></ul>
+      </section>
+
+      <section class="card tab-panel hidden" data-panel="history">
+        <h2>History</h2>
+        <p class="subtle">Last 14 days.</p>
+        <ul id="historyList" class="entries"></ul>
       </section>
     </main>
 
-    <section id="keyboardSheet" class="keyboard-sheet hidden" aria-hidden="true">
-      <div class="keyboard-grid" id="keyboardGrid"></div>
-      <button id="closeKeyboard" class="btn ghost" type="button">Close</button>
-    </section>
+    <div id="scannerOverlay" class="scanner hidden" aria-hidden="true">
+      <video id="scannerVideo" playsinline muted></video>
+      <div class="scanner-frame"></div>
+      <p id="scannerHint" class="scanner-hint">Point camera at a barcode</p>
+      <button id="closeScanner" class="btn ghost" type="button">Cancel</button>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
 
     <script src="app.js" defer></script>
-    <script src="/app.js" defer></script>
   </body>
 </html>
