@@ -580,8 +580,10 @@ els.saveProduct.addEventListener('click', () => {
   };
   persist();
   renderLibrary();
+  const label = f.name || f.barcode;
   clearForm();
-  toast(`Saved ${f.name || f.barcode} to library`);
+  els.scanResult.textContent = `✓ Saved "${label}" to library. Ready for the next product.`;
+  toast(`✓ Saved ${label} to library`, 2800);
   scheduleSync();
 });
 els.nutritionPhoto.addEventListener('change', (e) => {
