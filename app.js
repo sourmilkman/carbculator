@@ -24,7 +24,7 @@ const els = {
   carbsPerPortion: $('carbsPerPortion'), portionGrams: $('portionGrams'),
   carbsPerPiece: $('carbsPerPiece'), pieces: $('pieces'), totalPieces: $('totalPieces'),
   notes: $('notes'),
-  addEntry: $('addEntry'), nutritionPhoto: $('nutritionPhoto'),
+  addEntry: $('addEntry'), saveProduct: $('saveProduct'), nutritionPhoto: $('nutritionPhoto'),
   scanResult: $('scanResult'), carbPreview: $('carbPreview'),
   entriesList: $('entriesList'),
   syncDrive: $('syncDrive'), syncStatus: $('syncStatus'),
@@ -562,6 +562,28 @@ els.themeToggle.addEventListener('change', () => {
   applyTheme();
 });
 els.addEntry.addEventListener('click', addEntry);
+els.saveProduct.addEventListener('click', () => {
+  const f = readForm();
+  if (!f.barcode) { toast('Scan or enter a barcode first.'); els.barcode.focus(); return; }
+  if (!f.carbsPer100 && !f.carbsPerPortion && !f.carbsPerPiece) {
+    toast('Enter at least one carb value.'); return;
+  }
+  state.products[f.barcode] = {
+    barcode: f.barcode,
+    name: f.name,
+    carbsPer100: f.carbsPer100,
+    carbsPerPortion: f.carbsPerPortion,
+    portionGrams: f.portionGrams,
+    carbsPerPiece: f.carbsPerPiece,
+    totalPieces: f.totalPieces,
+    lastUsed: Date.now(),
+  };
+  persist();
+  renderLibrary();
+  clearForm();
+  toast(`Saved ${f.name || f.barcode} to library`);
+  scheduleSync();
+});
 els.nutritionPhoto.addEventListener('change', (e) => {
   const file = e.target.files?.[0];
   if (file) scanNutrition(file);
