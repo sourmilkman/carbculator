@@ -87,6 +87,7 @@
       <nav class="tabs" role="tablist">
         <button class="tab active" data-tab="add" type="button">Add</button>
         <button class="tab" data-tab="today" type="button">Today</button>
+        <button class="tab" data-tab="suggest" type="button">Suggest</button>
         <button class="tab" data-tab="library" type="button">Library</button>
         <button class="tab" data-tab="history" type="button">History</button>
       </nav>
@@ -221,6 +222,16 @@
         </div>
         <p id="syncStatus" class="subtle">Auto-syncs after every change once you've signed in.</p>
         <ul id="entriesList" class="entries"></ul>
+      </section>
+
+      <section class="card tab-panel hidden" data-panel="suggest">
+        <div class="row-between">
+          <h2>What else can I eat?</h2>
+          <button id="refreshSuggest" type="button" class="btn">Refresh</button>
+        </div>
+        <p id="suggestRemaining" class="subtle">Remaining today will appear here.</p>
+        <p id="suggestLacking" class="preview">—</p>
+        <ul id="suggestList" class="entries"></ul>
       </section>
 
       <section class="card tab-panel hidden" data-panel="library">

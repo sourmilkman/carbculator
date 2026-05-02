@@ -57,6 +57,8 @@ const els = {
   closeScanner: $('closeScanner'),
   libraryList: $('libraryList'), librarySearch: $('librarySearch'),
   historyList: $('historyList'),
+  suggestList: $('suggestList'), suggestRemaining: $('suggestRemaining'),
+  suggestLacking: $('suggestLacking'), refreshSuggest: $('refreshSuggest'),
   toast: $('toast'),
 };
 
@@ -298,11 +300,138 @@ function renderHistory() {
   });
 }
 
+function remainingMacros() {
+  const out = {};
+  MACROS.forEach((m) => { out[m] = state.limits[m] - dailyTotal(m); });
+  return out;
+}
+
+function lackingMacro(remaining) {
+  let best = null;
+  let bestPct = -Infinity;
+  MACROS.forEach((m) => {
+    const limit = state.limits[m] || 0;
+    if (limit <= 0) return;
+    const pct = remaining[m] / limit;
+    if (pct > bestPct) { bestPct = pct; best = m; }
+  });
+  return best;
+}
+
+function suggestionForProduct(p, remaining) {
+  // Use per-100g values; fall back to deriving per-100g from per-portion + portionGrams.
+  const per100 = {};
+  MACROS.forEach((m) => {
+    const direct = Number(p[fieldKey(m, 'Per100')]) || 0;
+    if (direct > 0) { per100[m] = direct; return; }
+    const cpp = Number(p[fieldKey(m, 'PerPortion')]) || 0;
+    const pg = Number(p.portionGrams) || 0;
+    per100[m] = cpp > 0 && pg > 0 ? (cpp / pg) * 100 : 0;
+  });
+  const hasAny = MACROS.some((m) => per100[m] > 0);
+  if (!hasAny) return null;
+
+  let maxGrams = Infinity;
+  let blockingMacro = null;
+  MACROS.forEach((m) => {
+    if (per100[m] <= 0) return;
+    if (remaining[m] <= 0) { maxGrams = 0; blockingMacro = m; return; }
+    const cap = (remaining[m] * 100) / per100[m];
+    if (cap < maxGrams) { maxGrams = cap; blockingMacro = m; }
+  });
+  if (!Number.isFinite(maxGrams) || maxGrams <= 0) return null;
+
+  // Round down to a friendly number.
+  const rounded = maxGrams >= 100 ? Math.floor(maxGrams / 10) * 10
+                : maxGrams >= 20  ? Math.floor(maxGrams / 5)  * 5
+                                  : Math.floor(maxGrams);
+  const grams = Math.max(1, rounded);
+
+  const contribution = {};
+  MACROS.forEach((m) => { contribution[m] = (grams * (per100[m] || 0)) / 100; });
+
+  return { product: p, grams, per100, contribution, blockingMacro };
+}
+
+function renderSuggestions() {
+  const remaining = remainingMacros();
+  const remTxt = MACROS.map((m) => `${remaining[m].toFixed(1)}g ${MACRO_LABEL[m]}`).join(' · ');
+  els.suggestRemaining.textContent = `Remaining today: ${remTxt}`;
+
+  const products = Object.values(state.products);
+  els.suggestList.innerHTML = '';
+
+  const allOver = MACROS.every((m) => remaining[m] <= 0);
+  if (allOver) {
+    els.suggestLacking.textContent = "You've hit every macro limit for today. Maybe call it a day.";
+    els.suggestList.innerHTML = '<li class="empty">Nothing fits — every macro is at or over its limit.</li>';
+    return;
+  }
+  if (!products.length) {
+    els.suggestLacking.textContent = 'Save some products to your library first, then come back.';
+    els.suggestList.innerHTML = '<li class="empty">No saved products yet.</li>';
+    return;
+  }
+
+  const lack = lackingMacro(remaining);
+  els.suggestLacking.textContent = lack
+    ? `Most room left in: ${MACRO_LABEL[lack]} (${remaining[lack].toFixed(1)}g). Foods rich in ${MACRO_LABEL[lack]} ranked first.`
+    : 'Showing what fits within your remaining budget.';
+
+  const suggestions = products
+    .map((p) => suggestionForProduct(p, remaining))
+    .filter(Boolean);
+
+  if (!suggestions.length) {
+    els.suggestList.innerHTML = '<li class="empty">No saved product fits in your remaining budget.</li>';
+    return;
+  }
+
+  // Score: prioritise (1) closing the lacking macro, (2) "purity" of the lacking macro per gram.
+  suggestions.forEach((s) => {
+    if (lack) {
+      const lackKcalDensity = (s.per100[lack] || 0) * KCAL_PER_G[lack];
+      const totalKcalDensity = MACROS.reduce(
+        (sum, m) => sum + (s.per100[m] || 0) * KCAL_PER_G[m], 0);
+      s.purity = totalKcalDensity > 0 ? lackKcalDensity / totalKcalDensity : 0;
+      s.score = (s.contribution[lack] || 0) * (0.5 + s.purity);
+    } else {
+      s.purity = 0;
+      s.score = MACROS.reduce((sum, m) => sum + (s.contribution[m] || 0), 0);
+    }
+  });
+  suggestions.sort((a, b) => b.score - a.score);
+
+  const top = suggestions.slice(0, 10);
+  top.forEach((s) => {
+    const p = s.product;
+    const portionTxt = p.portionGrams ? ` (${(s.grams / p.portionGrams).toFixed(1)} portions)` : '';
+    const contribTxt = MACROS
+      .map((m) => `+${s.contribution[m].toFixed(1)}g ${MACRO_LABEL[m]}`)
+      .join(' · ');
+    const purityBadge = lack && s.purity >= 0.5
+      ? ` <span class="purity-badge">${Math.round(s.purity * 100)}% ${MACRO_LABEL[lack]}</span>`
+      : '';
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div class="entry-main">
+        <strong>${escapeHtml(p.name || p.barcode || 'Unnamed')}${purityBadge}</strong>
+        <small>Eat up to <strong>${s.grams}g</strong>${portionTxt}</small>
+        <small class="entry-macros">${contribTxt}</small>
+      </div>
+      <div class="entry-side">
+        <button class="btn ghost" data-suggest="${p.barcode}" data-grams="${s.grams}">Log this</button>
+      </div>`;
+    els.suggestList.appendChild(li);
+  });
+}
+
 function renderAll() {
   renderHero();
   renderToday();
   renderLibrary();
   renderHistory();
+  renderSuggestions();
 }
 
 function escapeHtml(s) {
@@ -641,6 +770,7 @@ function setActiveTab(name) {
     t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach((p) =>
     p.classList.toggle('hidden', p.dataset.panel !== name));
+  if (name === 'suggest') renderSuggestions();
 }
 
 // ---------- Wire up ----------
@@ -784,6 +914,21 @@ els.libraryList.addEventListener('click', (e) => {
   if (del) deleteProduct(del);
 });
 els.librarySearch.addEventListener('input', renderLibrary);
+
+els.refreshSuggest.addEventListener('click', renderSuggestions);
+els.suggestList.addEventListener('click', (e) => {
+  const code = e.target.dataset.suggest;
+  if (!code) return;
+  const grams = Number(e.target.dataset.grams) || 0;
+  const p = state.products[code];
+  if (!p) return;
+  setActiveTab('add');
+  els.barcode.value = code;
+  applyProduct(p);
+  if (grams > 0) els.gramsConsumed.value = String(grams);
+  updatePreview();
+  els.gramsConsumed.focus();
+});
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 

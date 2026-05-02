@@ -346,6 +346,20 @@ h2 { font-size: 1.2rem; line-height: 1.2; }
   font-weight: 700;
 }
 
+.purity-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
 .field {
   display: grid;
   gap: 7px;
