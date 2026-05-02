@@ -24,20 +24,56 @@
           <span id="themeToggleLabel">Dark mode</span>
         </label>
         <div class="hero-copy">
-          <p class="eyebrow">Daily net carbs</p>
-          <h1 id="dailyTotal">0.0g</h1>
-          <p id="dailyStatus" class="status-pill">Within limit</p>
+          <p class="eyebrow">Today's macros</p>
+          <h1 class="hero-title">Keto tracker</h1>
+          <p class="hero-sub">Keto target ≈ 5% carbs · 20% protein · 75% fat</p>
         </div>
-        <div class="limit-wrap">
-          <div class="limit-heading">
-            <label for="limitRange">Daily limit</label>
-            <strong id="limitLabel">30g</strong>
+
+        <div class="macros">
+          <div class="macro-card" data-macro="carbs">
+            <div class="macro-head">
+              <p class="macro-name">Net carbs</p>
+              <p id="carbsStatus" class="status-pill">Within limit</p>
+            </div>
+            <h2 id="carbsTotal" class="macro-total">0.0g</h2>
+            <div class="limit-heading">
+              <label for="carbsLimitRange">Daily limit</label>
+              <strong id="carbsLimitLabel">30g</strong>
+            </div>
+            <input id="carbsLimitRange" type="range" min="0" max="100" step="1" value="30" />
+            <div class="meter" aria-hidden="true"><span id="carbsMeter"></span></div>
+            <p id="carbsHint" class="limit-hint">30g remaining today</p>
           </div>
-          <input id="limitRange" type="range" min="0" max="100" step="1" value="30" />
-          <div class="meter" aria-hidden="true">
-            <span id="limitMeter"></span>
+
+          <div class="macro-card" data-macro="fat">
+            <div class="macro-head">
+              <p class="macro-name">Fat</p>
+              <p id="fatStatus" class="status-pill">Within limit</p>
+            </div>
+            <h2 id="fatTotal" class="macro-total">0.0g</h2>
+            <div class="limit-heading">
+              <label for="fatLimitRange">Daily limit</label>
+              <strong id="fatLimitLabel">165g</strong>
+            </div>
+            <input id="fatLimitRange" type="range" min="0" max="300" step="1" value="165" />
+            <div class="meter" aria-hidden="true"><span id="fatMeter"></span></div>
+            <p id="fatHint" class="limit-hint">165g remaining today</p>
           </div>
-          <p id="limitHint" class="limit-hint">30g remaining today</p>
+
+          <div class="macro-card" data-macro="protein">
+            <div class="macro-head">
+              <p class="macro-name">Protein</p>
+              <p id="proteinStatus" class="status-pill">Within limit</p>
+            </div>
+            <h2 id="proteinTotal" class="macro-total">0.0g</h2>
+            <div class="limit-heading">
+              <label for="proteinLimitRange">Daily limit</label>
+              <strong id="proteinLimitLabel">100g</strong>
+            </div>
+            <input id="proteinLimitRange" type="range" min="0" max="250" step="1" value="100" />
+            <div class="meter" aria-hidden="true"><span id="proteinMeter"></span></div>
+            <p id="proteinHint" class="limit-hint">100g remaining today</p>
+          </div>
         </div>
       </header>
 
@@ -68,27 +104,74 @@
             Product name
             <input id="productName" type="text" placeholder="e.g. Greek Yogurt" />
           </label>
+        </div>
+
+        <fieldset class="macro-fieldset">
+          <legend>Per 100g</legend>
+          <div class="macro-trio">
+            <label class="field">
+              Carbs
+              <input id="carbsPer100" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+            <label class="field">
+              Fat
+              <input id="fatPer100" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+            <label class="field">
+              Protein
+              <input id="proteinPer100" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="macro-fieldset">
+          <legend>Per portion (optional)</legend>
+          <div class="macro-trio">
+            <label class="field">
+              Carbs
+              <input id="carbsPerPortion" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+            <label class="field">
+              Fat
+              <input id="fatPerPortion" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+            <label class="field">
+              Protein
+              <input id="proteinPerPortion" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+          </div>
+          <div class="grid-two">
+            <label class="field">
+              Portion grams
+              <input id="portionGrams" inputmode="decimal" type="number" step="0.1" placeholder="0" />
+            </label>
+            <label class="field">
+              Total pieces in product
+              <input id="totalPieces" inputmode="numeric" type="number" step="1" placeholder="e.g. 8" />
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="macro-fieldset">
+          <legend>Per piece (override, optional)</legend>
+          <div class="macro-trio">
+            <label class="field">
+              Carbs
+              <input id="carbsPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="auto" />
+            </label>
+            <label class="field">
+              Fat
+              <input id="fatPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="auto" />
+            </label>
+            <label class="field">
+              Protein
+              <input id="proteinPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="auto" />
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="grid-two">
           <label class="field">
-            Carbs per 100g
-            <input id="carbsPer100" inputmode="decimal" type="number" step="0.1" placeholder="0" />
-          </label>
-          <label class="field">
-            Carbs per portion (optional)
-            <input id="carbsPerPortion" inputmode="decimal" type="number" step="0.1" placeholder="0" />
-          </label>
-          <label class="field">
-            Portion grams (optional)
-            <input id="portionGrams" inputmode="decimal" type="number" step="0.1" placeholder="0" />
-          </label>
-          <label class="field">
-            Total pieces in product (optional)
-            <input id="totalPieces" inputmode="numeric" type="number" step="1" placeholder="e.g. 8" />
-          </label>
-          <label class="field">
-            Carbs per piece (override, optional)
-            <input id="carbsPerPiece" inputmode="decimal" type="number" step="0.1" placeholder="auto" />
-          </label>
-          <label class="field full">
             Pieces consumed
             <input id="pieces" inputmode="decimal" type="number" step="0.5" placeholder="0" />
           </label>
@@ -116,7 +199,7 @@
           <button class="chip" type="button" data-pieces="10">10 pieces</button>
         </div>
 
-        <p id="carbPreview" class="preview">0.0g carbs for this entry</p>
+        <p id="carbPreview" class="preview">0.0g carbs · 0.0g fat · 0.0g protein for this entry</p>
 
         <div class="action-row">
           <button id="saveProduct" class="btn ghost" type="button">Save to library only</button>

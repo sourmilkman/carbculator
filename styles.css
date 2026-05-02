@@ -68,15 +68,77 @@ button, input { font: inherit; }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
-  gap: 24px;
-  align-items: end;
+  gap: 20px;
   position: relative;
-  min-height: 220px;
   padding: 28px;
   border-radius: 12px;
   color: #f8fbfc;
   background: linear-gradient(135deg, var(--hero-grad-a), var(--hero-grad-b));
+}
+
+.hero-title {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.hero-sub {
+  margin: 0;
+  color: #cce4e0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.macros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.macro-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.11);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 180ms ease, background 180ms ease;
+}
+.macro-card.ok   { border-color: rgba(125, 216, 199, 0.55); }
+.macro-card.warn { border-color: rgba(240, 191, 84, 0.6); }
+.macro-card.bad  { border-color: rgba(240, 120, 112, 0.7); background: rgba(194, 65, 60, 0.18); }
+
+.macro-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.macro-name {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #a7d9d2;
+}
+.macro-total {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  line-height: 1;
+  font-weight: 800;
+}
+
+.macro-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.macro-pills .status-pill {
+  font-size: 0.78rem;
+  padding: 4px 9px;
 }
 
 .theme-toggle {
@@ -123,7 +185,7 @@ button, input { font: inherit; }
 .theme-toggle input:checked + .toggle-track { background: var(--gold); }
 .theme-toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(16px); }
 
-.hero-copy { display: grid; gap: 10px; }
+.hero-copy { display: grid; gap: 6px; padding-right: 110px; }
 
 .eyebrow {
   margin: 0;
@@ -151,26 +213,17 @@ h2 { font-size: 1.2rem; line-height: 1.2; }
 .status-pill.warn { background: rgba(217, 154, 43, 0.24); color: #ffe0a3; }
 .status-pill.bad  { background: rgba(194, 65, 60, 0.24);  color: #ffd7d4; }
 
-.limit-wrap {
-  display: grid;
-  gap: 12px;
-  padding: 18px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.11);
-  backdrop-filter: blur(8px);
-}
-
 .limit-heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
-.limit-heading label { color: #cce4e0; font-weight: 700; }
-.limit-heading strong { font-size: 1.8rem; }
+.limit-heading label { color: #cce4e0; font-weight: 700; font-size: 0.85rem; }
+.limit-heading strong { font-size: 1.1rem; }
 
-#limitRange { width: 100%; accent-color: var(--gold); }
+.macro-card input[type="range"] { width: 100%; accent-color: var(--gold); }
 
 .meter {
   height: 12px;
@@ -226,6 +279,33 @@ h2 { font-size: 1.2rem; line-height: 1.2; }
   margin-top: 14px;
 }
 .field.full { grid-column: 1 / -1; }
+
+.macro-fieldset {
+  margin: 14px 0 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel), transparent 20%);
+}
+.macro-fieldset legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.macro-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.macro-fieldset .grid-two { margin-top: 10px; }
+
+.entry-macros {
+  color: var(--muted);
+  font-weight: 700;
+}
 
 .field {
   display: grid;
@@ -419,11 +499,10 @@ input:focus, .search:focus {
 
 @media (max-width: 760px) {
   .app-shell { padding-inline: 12px; }
-  .hero {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    padding: 22px;
-  }
+  .hero { padding: 22px; }
+  .hero-copy { padding-right: 90px; }
+  .macros { grid-template-columns: 1fr; }
   .grid-two { grid-template-columns: 1fr; }
+  .macro-trio { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .search { max-width: none; }
 }

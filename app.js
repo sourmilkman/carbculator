@@ -2,10 +2,20 @@ const GOOGLE_CLIENT_ID = '1629709103-c7ltm86t4lbiaaqi7igedtsadjosqrdj.apps.googl
 const DRIVE_FILENAME = 'carbculator_entries.json';
 const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 
+// Keto macro defaults: ~5% carbs, ~20% protein, ~75% fat of a 2000 kcal/day reference.
+const MACROS = ['carbs', 'fat', 'protein'];
+const MACRO_LABEL = { carbs: 'carbs', fat: 'fat', protein: 'protein' };
+const DEFAULT_LIMITS = { carbs: 30, fat: 165, protein: 100 };
+
+const storedLimits = JSON.parse(localStorage.getItem('macroLimits') || 'null');
+const legacyCarbLimit = Number(localStorage.getItem('carbLimit') || 0);
+
 const state = {
   entries: JSON.parse(localStorage.getItem('carbEntries') || '[]'),
   products: JSON.parse(localStorage.getItem('carbProducts') || '{}'), // keyed by barcode
-  limit: Number(localStorage.getItem('carbLimit') || 30),
+  limits: storedLimits
+    ? { ...DEFAULT_LIMITS, ...storedLimits }
+    : { ...DEFAULT_LIMITS, ...(legacyCarbLimit ? { carbs: legacyCarbLimit } : {}) },
   driveFileId: localStorage.getItem('driveFileId') || '',
   theme: localStorage.getItem('carbTheme') || (prefersDark ? 'dark' : 'light'),
   token: '',
@@ -15,14 +25,22 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const els = {
-  dailyTotal: $('dailyTotal'), dailyStatus: $('dailyStatus'),
   themeToggle: $('themeToggle'), themeToggleLabel: $('themeToggleLabel'),
-  limitRange: $('limitRange'), limitLabel: $('limitLabel'),
-  limitMeter: $('limitMeter'), limitHint: $('limitHint'),
+  // per-macro hero elements
+  totals: { carbs: $('carbsTotal'), fat: $('fatTotal'), protein: $('proteinTotal') },
+  statuses: { carbs: $('carbsStatus'), fat: $('fatStatus'), protein: $('proteinStatus') },
+  limitRanges: { carbs: $('carbsLimitRange'), fat: $('fatLimitRange'), protein: $('proteinLimitRange') },
+  limitLabels: { carbs: $('carbsLimitLabel'), fat: $('fatLimitLabel'), protein: $('proteinLimitLabel') },
+  meters: { carbs: $('carbsMeter'), fat: $('fatMeter'), protein: $('proteinMeter') },
+  hints: { carbs: $('carbsHint'), fat: $('fatHint'), protein: $('proteinHint') },
+
   barcode: $('barcode'), productName: $('productName'),
-  gramsConsumed: $('gramsConsumed'), carbsPer100: $('carbsPer100'),
-  carbsPerPortion: $('carbsPerPortion'), portionGrams: $('portionGrams'),
-  carbsPerPiece: $('carbsPerPiece'), pieces: $('pieces'), totalPieces: $('totalPieces'),
+  gramsConsumed: $('gramsConsumed'),
+  carbsPer100: $('carbsPer100'), fatPer100: $('fatPer100'), proteinPer100: $('proteinPer100'),
+  carbsPerPortion: $('carbsPerPortion'), fatPerPortion: $('fatPerPortion'), proteinPerPortion: $('proteinPerPortion'),
+  carbsPerPiece: $('carbsPerPiece'), fatPerPiece: $('fatPerPiece'), proteinPerPiece: $('proteinPerPiece'),
+  portionGrams: $('portionGrams'),
+  pieces: $('pieces'), totalPieces: $('totalPieces'),
   notes: $('notes'),
   addEntry: $('addEntry'), saveProduct: $('saveProduct'), nutritionPhoto: $('nutritionPhoto'),
   scanResult: $('scanResult'), carbPreview: $('carbPreview'),
@@ -39,6 +57,9 @@ const els = {
 const today = () => new Date().toISOString().slice(0, 10);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const fieldKey = (macro, suffix) => macro + cap(suffix); // e.g. carbsPer100
+
 function toast(msg, ms = 1800) {
   els.toast.textContent = msg;
   els.toast.classList.remove('hidden');
@@ -46,49 +67,63 @@ function toast(msg, ms = 1800) {
   toast._t = setTimeout(() => els.toast.classList.add('hidden'), ms);
 }
 
-function derivePerPiece({ carbsPerPiece, carbsPerPortion, portionGrams, carbsPer100, totalPieces }) {
-  const manual = Number(carbsPerPiece) || 0;
+function derivePerPiece(f, macro) {
+  const manual = Number(f[fieldKey(macro, 'PerPiece')]) || 0;
   if (manual > 0) return manual;
-  const tp = Number(totalPieces) || 0;
+  const tp = Number(f.totalPieces) || 0;
   if (tp <= 0) return 0;
-  const cpp = Number(carbsPerPortion) || 0;
+  const cpp = Number(f[fieldKey(macro, 'PerPortion')]) || 0;
   if (cpp > 0) return cpp / tp;
-  const pg = Number(portionGrams) || 0;
-  const c100 = Number(carbsPer100) || 0;
+  const pg = Number(f.portionGrams) || 0;
+  const c100 = Number(f[fieldKey(macro, 'Per100')]) || 0;
   if (pg > 0 && c100 > 0) return (pg * c100 / 100) / tp;
   return 0;
 }
 
-function calcCarbs(f) {
+function calcMacro(f, macro) {
   const grams = Number(f.grams) || 0;
   const pieces = Number(f.pieces) || 0;
-  const perPiece = derivePerPiece(f);
+  const perPiece = derivePerPiece(f, macro);
   if (pieces > 0 && perPiece > 0) return pieces * perPiece;
-  if (Number(f.carbsPer100) > 0 && grams > 0) return (grams / 100) * Number(f.carbsPer100);
-  if (Number(f.carbsPerPortion) > 0 && Number(f.portionGrams) > 0 && grams > 0)
-    return (grams / Number(f.portionGrams)) * Number(f.carbsPerPortion);
+  const c100 = Number(f[fieldKey(macro, 'Per100')]) || 0;
+  if (c100 > 0 && grams > 0) return (grams / 100) * c100;
+  const cpp = Number(f[fieldKey(macro, 'PerPortion')]) || 0;
+  const pg = Number(f.portionGrams) || 0;
+  if (cpp > 0 && pg > 0 && grams > 0) return (grams / pg) * cpp;
   return 0;
 }
 
+function calcAllMacros(f) {
+  const out = {};
+  MACROS.forEach((m) => { out[m] = calcMacro(f, m); });
+  return out;
+}
+
 function readForm() {
-  return {
+  const f = {
     barcode: els.barcode.value.trim(),
     name: els.productName.value.trim(),
     grams: Number(els.gramsConsumed.value || 0),
-    carbsPer100: Number(els.carbsPer100.value || 0),
-    carbsPerPortion: Number(els.carbsPerPortion.value || 0),
     portionGrams: Number(els.portionGrams.value || 0),
-    carbsPerPiece: Number(els.carbsPerPiece.value || 0),
     pieces: Number(els.pieces.value || 0),
     totalPieces: Number(els.totalPieces.value || 0),
     notes: els.notes.value.trim(),
   };
+  MACROS.forEach((m) => {
+    f[fieldKey(m, 'Per100')] = Number(els[fieldKey(m, 'Per100')].value || 0);
+    f[fieldKey(m, 'PerPortion')] = Number(els[fieldKey(m, 'PerPortion')].value || 0);
+    f[fieldKey(m, 'PerPiece')] = Number(els[fieldKey(m, 'PerPiece')].value || 0);
+  });
+  return f;
 }
 
 function clearForm() {
-  ['barcode', 'productName', 'gramsConsumed', 'carbsPer100',
-   'carbsPerPortion', 'portionGrams', 'carbsPerPiece', 'pieces', 'totalPieces', 'notes']
-    .forEach((k) => (els[k].value = ''));
+  const keys = ['barcode', 'productName', 'gramsConsumed', 'portionGrams',
+                'pieces', 'totalPieces', 'notes'];
+  MACROS.forEach((m) => {
+    keys.push(fieldKey(m, 'Per100'), fieldKey(m, 'PerPortion'), fieldKey(m, 'PerPiece'));
+  });
+  keys.forEach((k) => { if (els[k]) els[k].value = ''; });
   els.scanResult.textContent = 'Scan a barcode — saved products auto-fill. New ones look up Open Food Facts.';
   updatePreview();
 }
@@ -96,11 +131,14 @@ function clearForm() {
 function applyProduct(p) {
   if (!p) return;
   if (p.name) els.productName.value = p.name;
-  if (p.carbsPer100) els.carbsPer100.value = String(p.carbsPer100);
-  if (p.carbsPerPortion) els.carbsPerPortion.value = String(p.carbsPerPortion);
   if (p.portionGrams) els.portionGrams.value = String(p.portionGrams);
-  if (p.carbsPerPiece) els.carbsPerPiece.value = String(p.carbsPerPiece);
   if (p.totalPieces) els.totalPieces.value = String(p.totalPieces);
+  MACROS.forEach((m) => {
+    ['Per100', 'PerPortion', 'PerPiece'].forEach((suf) => {
+      const k = fieldKey(m, suf);
+      if (p[k]) els[k].value = String(p[k]);
+    });
+  });
   updatePreview();
 }
 
@@ -112,50 +150,66 @@ function applyTheme() {
 
 function updatePreview() {
   const f = readForm();
-  const c = calcCarbs(f);
-  const perPiece = derivePerPiece(f);
-  let txt = `${c.toFixed(1)}g carbs for this entry`;
-  if (perPiece > 0) {
-    txt += ` · each piece ≈ ${perPiece.toFixed(2)}g`;
-    const remaining = state.limit - dailyTotal();
-    if (perPiece > 0 && remaining > 0) {
-      const safe = Math.floor(remaining / perPiece);
-      txt += ` · ${safe} piece${safe === 1 ? '' : 's'} left within today's limit`;
+  const macros = calcAllMacros(f);
+  const parts = MACROS.map((m) => `${macros[m].toFixed(1)}g ${MACRO_LABEL[m]}`);
+  let txt = `${parts.join(' · ')} for this entry`;
+
+  const perPieceCarbs = derivePerPiece(f, 'carbs');
+  if (perPieceCarbs > 0) {
+    txt += ` · each piece ≈ ${perPieceCarbs.toFixed(2)}g carbs`;
+    const remaining = state.limits.carbs - dailyTotal('carbs');
+    if (remaining > 0) {
+      const safe = Math.floor(remaining / perPieceCarbs);
+      txt += ` · ${safe} piece${safe === 1 ? '' : 's'} left within today's carb limit`;
     }
   }
   els.carbPreview.textContent = txt;
 }
 
-function dailyTotal(date = today()) {
+function dailyTotal(macro, date = today()) {
   return state.entries
     .filter((e) => e.date === date)
-    .reduce((s, e) => s + (Number(e.carbs) || 0), 0);
+    .reduce((s, e) => s + (Number(e[macro]) || 0), 0);
+}
+
+function statusFor(total, limit) {
+  const ratio = limit === 0 ? 1 : total / limit;
+  if (total > limit) return { cls: 'bad', label: 'Exceeded limit' };
+  if (ratio >= 0.8) return { cls: 'warn', label: 'Near limit' };
+  return { cls: 'ok', label: 'Within limit' };
 }
 
 function renderHero() {
-  const total = dailyTotal();
-  const ratio = state.limit === 0 ? 1 : total / state.limit;
-  const meterPercent = state.limit === 0 ? 100 : Math.min(100, Math.max(0, ratio * 100));
+  MACROS.forEach((m) => {
+    const total = dailyTotal(m);
+    const limit = state.limits[m];
+    const ratio = limit === 0 ? 1 : total / limit;
+    const meterPercent = limit === 0 ? 100 : Math.min(100, Math.max(0, ratio * 100));
 
-  els.dailyTotal.textContent = `${total.toFixed(1)}g`;
-  els.limitLabel.textContent = `${state.limit}g`;
-  els.limitMeter.style.width = `${meterPercent}%`;
-  const remaining = state.limit - total;
-  els.limitHint.textContent = remaining >= 0
-    ? `${remaining.toFixed(1)}g remaining today`
-    : `${Math.abs(remaining).toFixed(1)}g over today`;
+    els.totals[m].textContent = `${total.toFixed(1)}g`;
+    els.limitLabels[m].textContent = `${limit}g`;
+    els.meters[m].style.width = `${meterPercent}%`;
+    const remaining = limit - total;
+    els.hints[m].textContent = remaining >= 0
+      ? `${remaining.toFixed(1)}g remaining today`
+      : `${Math.abs(remaining).toFixed(1)}g over today`;
 
-  els.dailyStatus.classList.remove('ok', 'warn', 'bad');
-  if (total > state.limit) {
-    els.dailyStatus.textContent = 'Exceeded limit';
-    els.dailyStatus.classList.add('bad');
-  } else if (ratio >= 0.8) {
-    els.dailyStatus.textContent = 'Near limit';
-    els.dailyStatus.classList.add('warn');
-  } else {
-    els.dailyStatus.textContent = 'Within limit';
-    els.dailyStatus.classList.add('ok');
-  }
+    const s = statusFor(total, limit);
+    const pill = els.statuses[m];
+    pill.classList.remove('ok', 'warn', 'bad');
+    pill.classList.add(s.cls);
+    pill.textContent = s.label;
+
+    const card = pill.closest('.macro-card');
+    if (card) {
+      card.classList.remove('ok', 'warn', 'bad');
+      card.classList.add(s.cls);
+    }
+  });
+}
+
+function entryMacroSummary(entry) {
+  return MACROS.map((m) => `${(Number(entry[m]) || 0).toFixed(1)}g ${MACRO_LABEL[m]}`).join(' · ');
 }
 
 function renderToday() {
@@ -171,9 +225,10 @@ function renderToday() {
       <div class="entry-main">
         <strong>${escapeHtml(entry.name || 'Unnamed item')}</strong>
         <small>${entry.pieces > 0 ? entry.pieces + ' pcs' : entry.grams + 'g'}${entry.notes ? ' · ' + escapeHtml(entry.notes) : ''}</small>
+        <small class="entry-macros">${entryMacroSummary(entry)}</small>
       </div>
       <div class="entry-side">
-        <span class="entry-carbs">${entry.carbs.toFixed(1)}g</span>
+        <span class="entry-carbs">${(Number(entry.carbs) || 0).toFixed(1)}g</span>
         <button class="icon-btn" data-del="${entry.id}" aria-label="Delete">×</button>
       </div>`;
     els.entriesList.appendChild(li);
@@ -191,11 +246,12 @@ function renderLibrary() {
     return;
   }
   items.forEach((p) => {
+    const macroText = MACROS.map((m) => `${Number(p[fieldKey(m, 'Per100')]) || 0}g ${MACRO_LABEL[m]}`).join(' · ');
     const li = document.createElement('li');
     li.innerHTML = `
       <div class="entry-main">
         <strong>${escapeHtml(p.name || 'Unnamed')}</strong>
-        <small>${p.barcode || ''} · ${p.carbsPer100 || 0}g/100g</small>
+        <small>${p.barcode || ''} · per 100g: ${macroText}</small>
       </div>
       <div class="entry-side">
         <button class="btn ghost" data-use="${p.barcode}">Use</button>
@@ -208,7 +264,9 @@ function renderLibrary() {
 function renderHistory() {
   const days = {};
   state.entries.forEach((e) => {
-    days[e.date] = (days[e.date] || 0) + (Number(e.carbs) || 0);
+    const d = (days[e.date] = days[e.date] || { carbs: 0, fat: 0, protein: 0, count: 0 });
+    MACROS.forEach((m) => { d[m] += Number(e[m]) || 0; });
+    d.count += 1;
   });
   const sorted = Object.entries(days).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14);
   els.historyList.innerHTML = '';
@@ -216,16 +274,19 @@ function renderHistory() {
     els.historyList.innerHTML = '<li class="empty">No history yet.</li>';
     return;
   }
-  sorted.forEach(([date, total]) => {
+  sorted.forEach(([date, totals]) => {
+    const pills = MACROS.map((m) => {
+      const s = statusFor(totals[m], state.limits[m]);
+      return `<span class="status-pill ${s.cls}" title="${MACRO_LABEL[m]}">${MACRO_LABEL[m].charAt(0).toUpperCase()}: ${totals[m].toFixed(1)}g</span>`;
+    }).join('');
     const li = document.createElement('li');
-    const status = total > state.limit ? 'bad' : total / state.limit >= 0.8 ? 'warn' : 'ok';
     li.innerHTML = `
       <div class="entry-main">
         <strong>${date}</strong>
-        <small>${state.entries.filter((e) => e.date === date).length} entries</small>
+        <small>${totals.count} entries</small>
       </div>
-      <div class="entry-side">
-        <span class="status-pill ${status}">${total.toFixed(1)}g</span>
+      <div class="entry-side macro-pills">
+        ${pills}
       </div>`;
     els.historyList.appendChild(li);
   });
@@ -245,41 +306,50 @@ function escapeHtml(s) {
 function persist() {
   localStorage.setItem('carbEntries', JSON.stringify(state.entries));
   localStorage.setItem('carbProducts', JSON.stringify(state.products));
+  localStorage.setItem('macroLimits', JSON.stringify(state.limits));
+}
+
+function productPayload(f) {
+  const p = {
+    barcode: f.barcode,
+    name: f.name,
+    portionGrams: f.portionGrams,
+    totalPieces: f.totalPieces,
+    lastUsed: Date.now(),
+  };
+  MACROS.forEach((m) => {
+    ['Per100', 'PerPortion', 'PerPiece'].forEach((suf) => {
+      const k = fieldKey(m, suf);
+      p[k] = f[k];
+    });
+  });
+  return p;
 }
 
 function addEntry() {
   const f = readForm();
-  const carbs = calcCarbs(f);
-  const usingPieces = f.pieces > 0 && f.carbsPerPiece > 0;
+  const macros = calcAllMacros(f);
+  const usingPieces = f.pieces > 0 && (f.carbsPerPiece > 0 || f.fatPerPiece > 0 || f.proteinPerPiece > 0);
   if (!usingPieces && (!f.grams || f.grams <= 0)) {
     toast('Enter grams consumed (or pieces + carbs/piece).');
     return;
   }
-  if (carbs <= 0) {
-    toast('Enter carbs/100g, per portion, or per piece.');
+  if (macros.carbs <= 0 && macros.fat <= 0 && macros.protein <= 0) {
+    toast('Enter at least one macro (per 100g, per portion, or per piece).');
     return;
   }
 
-  const entry = { id: uid(), date: today(), carbs, ...f };
+  const entry = { id: uid(), date: today(), ...f, ...macros };
   state.entries.push(entry);
 
   if (f.barcode) {
-    state.products[f.barcode] = {
-      barcode: f.barcode,
-      name: f.name,
-      carbsPer100: f.carbsPer100,
-      carbsPerPortion: f.carbsPerPortion,
-      portionGrams: f.portionGrams,
-      carbsPerPiece: f.carbsPerPiece,
-      totalPieces: f.totalPieces,
-      lastUsed: Date.now(),
-    };
+    state.products[f.barcode] = productPayload(f);
   }
 
   persist();
   renderAll();
   clearForm();
-  toast(`Added ${carbs.toFixed(1)}g carbs`);
+  toast(`Added ${macros.carbs.toFixed(1)}g carbs · ${macros.fat.toFixed(1)}g fat · ${macros.protein.toFixed(1)}g protein`);
   scheduleSync();
 }
 
@@ -304,11 +374,15 @@ async function lookupOpenFoodFacts(barcode) {
     const data = await r.json();
     if (data.status !== 1 || !data.product) return null;
     const p = data.product;
-    const carbs = Number(p.nutriments?.['carbohydrates_100g']) || 0;
+    const n = p.nutriments || {};
     return {
       name: p.product_name || p.generic_name || '',
-      carbsPer100: carbs,
-      carbsPerPortion: Number(p.nutriments?.['carbohydrates_serving']) || 0,
+      carbsPer100: Number(n['carbohydrates_100g']) || 0,
+      fatPer100: Number(n['fat_100g']) || 0,
+      proteinPer100: Number(n['proteins_100g']) || 0,
+      carbsPerPortion: Number(n['carbohydrates_serving']) || 0,
+      fatPerPortion: Number(n['fat_serving']) || 0,
+      proteinPerPortion: Number(n['proteins_serving']) || 0,
       portionGrams: Number(p.serving_quantity) || 0,
     };
   } catch {
@@ -327,11 +401,11 @@ async function handleBarcode(code) {
   }
   els.scanResult.textContent = 'Looking up Open Food Facts…';
   const off = await lookupOpenFoodFacts(code);
-  if (off && (off.carbsPer100 || off.carbsPerPortion)) {
+  if (off && (off.carbsPer100 || off.carbsPerPortion || off.fatPer100 || off.proteinPer100)) {
     applyProduct(off);
     els.scanResult.textContent = `Found: ${off.name || 'product'}. Verify and add grams.`;
   } else {
-    els.scanResult.textContent = 'New barcode — enter carbs manually. It will be saved for next time.';
+    els.scanResult.textContent = 'New barcode — enter macros manually. It will be saved for next time.';
     els.productName.focus();
   }
 }
@@ -402,12 +476,13 @@ function closeScanner() {
 }
 
 // ---------- Nutrition label OCR ----------
-function extractCarbsPer100(rawText) {
+function extractMacroPer100(rawText, keywords) {
   const text = rawText.replace(/\s+/g, ' ').trim();
+  const kw = keywords.join('|');
   const patterns = [
-    /carbohydrate[s]?[^\d]{0,40}(\d+[.,]?\d*)\s*g[^\d]{0,40}(?:per\s*)?100\s*g/i,
-    /(?:per\s*)?100\s*g[^\d]{0,60}carbohydrate[s]?[^\d]{0,40}(\d+[.,]?\d*)\s*g/i,
-    /carbohydrate[s]?[^\d]{0,40}(\d+[.,]?\d*)\s*g/i,
+    new RegExp(`(?:${kw})[^\\d]{0,40}(\\d+[.,]?\\d*)\\s*g[^\\d]{0,40}(?:per\\s*)?100\\s*g`, 'i'),
+    new RegExp(`(?:per\\s*)?100\\s*g[^\\d]{0,60}(?:${kw})[^\\d]{0,40}(\\d+[.,]?\\d*)\\s*g`, 'i'),
+    new RegExp(`(?:${kw})[^\\d]{0,40}(\\d+[.,]?\\d*)\\s*g`, 'i'),
   ];
   for (const pat of patterns) {
     const m = text.match(pat);
@@ -423,13 +498,19 @@ async function scanNutrition(file) {
   els.scanResult.textContent = 'Reading label…';
   try {
     const result = await Tesseract.recognize(file, 'eng');
-    const v = extractCarbsPer100(result.data.text);
-    if (v > 0) {
-      els.carbsPer100.value = String(v);
-      els.scanResult.textContent = `Detected ~${v}g carbs per 100g. Verify before adding.`;
+    const text = result.data.text;
+    const carbs = extractMacroPer100(text, ['carbohydrate', 'carbohydrates', 'carbs']);
+    const fat = extractMacroPer100(text, ['fat', 'total fat']);
+    const protein = extractMacroPer100(text, ['protein', 'proteins']);
+    const found = [];
+    if (carbs > 0) { els.carbsPer100.value = String(carbs); found.push(`carbs ${carbs}g`); }
+    if (fat > 0)   { els.fatPer100.value = String(fat);     found.push(`fat ${fat}g`); }
+    if (protein > 0) { els.proteinPer100.value = String(protein); found.push(`protein ${protein}g`); }
+    if (found.length) {
+      els.scanResult.textContent = `Detected per 100g: ${found.join(', ')}. Verify before adding.`;
       updatePreview();
     } else {
-      els.scanResult.textContent = 'Could not read carbs. Enter manually.';
+      els.scanResult.textContent = 'Could not read macros. Enter manually.';
     }
   } catch {
     els.scanResult.textContent = 'Scan failed.';
@@ -500,6 +581,12 @@ async function pullFromDrive(token, fileId) {
         if (!local || (p.lastUsed || 0) > (local.lastUsed || 0)) state.products[code] = p;
       });
     }
+    if (data.limits && typeof data.limits === 'object') {
+      state.limits = { ...DEFAULT_LIMITS, ...state.limits, ...data.limits };
+      MACROS.forEach((m) => {
+        if (els.limitRanges[m]) els.limitRanges[m].value = String(state.limits[m]);
+      });
+    }
     persist();
   } catch { /* ignore */ }
 }
@@ -515,7 +602,12 @@ async function syncToDrive({ interactive = false } = {}) {
     await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entries: state.entries, products: state.products, updatedAt: new Date().toISOString() }),
+      body: JSON.stringify({
+        entries: state.entries,
+        products: state.products,
+        limits: state.limits,
+        updatedAt: new Date().toISOString(),
+      }),
     });
     els.syncDrive.textContent = 'Synced ✓';
     els.syncStatus.textContent = `Last synced ${new Date().toLocaleTimeString()}`;
@@ -546,16 +638,22 @@ function setActiveTab(name) {
 }
 
 // ---------- Wire up ----------
-els.limitRange.value = String(state.limit);
+MACROS.forEach((m) => {
+  els.limitRanges[m].value = String(state.limits[m]);
+});
 applyTheme();
 renderAll();
 
-els.limitRange.addEventListener('input', () => {
-  state.limit = Number(els.limitRange.value);
-  localStorage.setItem('carbLimit', String(state.limit));
-  renderHero();
-  renderHistory();
+MACROS.forEach((m) => {
+  els.limitRanges[m].addEventListener('input', () => {
+    state.limits[m] = Number(els.limitRanges[m].value);
+    persist();
+    renderHero();
+    renderHistory();
+    updatePreview();
+  });
 });
+
 els.themeToggle.addEventListener('change', () => {
   state.theme = els.themeToggle.checked ? 'dark' : 'light';
   localStorage.setItem('carbTheme', state.theme);
@@ -565,19 +663,10 @@ els.addEntry.addEventListener('click', addEntry);
 els.saveProduct.addEventListener('click', () => {
   const f = readForm();
   if (!f.barcode) { toast('Scan or enter a barcode first.'); els.barcode.focus(); return; }
-  if (!f.carbsPer100 && !f.carbsPerPortion && !f.carbsPerPiece) {
-    toast('Enter at least one carb value.'); return;
-  }
-  state.products[f.barcode] = {
-    barcode: f.barcode,
-    name: f.name,
-    carbsPer100: f.carbsPer100,
-    carbsPerPortion: f.carbsPerPortion,
-    portionGrams: f.portionGrams,
-    carbsPerPiece: f.carbsPerPiece,
-    totalPieces: f.totalPieces,
-    lastUsed: Date.now(),
-  };
+  const hasAny = MACROS.some((m) =>
+    f[fieldKey(m, 'Per100')] > 0 || f[fieldKey(m, 'PerPortion')] > 0 || f[fieldKey(m, 'PerPiece')] > 0);
+  if (!hasAny) { toast('Enter at least one macro value.'); return; }
+  state.products[f.barcode] = productPayload(f);
   persist();
   renderLibrary();
   const label = f.name || f.barcode;
@@ -594,9 +683,14 @@ els.syncDrive.addEventListener('click', () => syncToDrive({ interactive: !state.
 els.scanBarcode.addEventListener('click', openScanner);
 els.closeScanner.addEventListener('click', closeScanner);
 
-['carbsPer100', 'carbsPerPortion', 'portionGrams', 'gramsConsumed', 'carbsPerPiece', 'pieces', 'totalPieces'].forEach((k) => {
-  els[k].addEventListener('input', updatePreview);
+const previewInputs = ['gramsConsumed', 'portionGrams', 'pieces', 'totalPieces'];
+MACROS.forEach((m) => {
+  previewInputs.push(fieldKey(m, 'Per100'), fieldKey(m, 'PerPortion'), fieldKey(m, 'PerPiece'));
 });
+previewInputs.forEach((k) => {
+  if (els[k]) els[k].addEventListener('input', updatePreview);
+});
+
 els.barcode.addEventListener('change', () => {
   const v = els.barcode.value.trim();
   if (v.length >= 6) handleBarcode(v);
@@ -617,9 +711,10 @@ document.querySelectorAll('[data-portion]').forEach((b) => {
 document.querySelectorAll('[data-pieces]').forEach((b) => {
   b.addEventListener('click', () => {
     els.pieces.value = b.dataset.pieces;
-    const perPiece = derivePerPiece(readForm());
-    if (perPiece <= 0) {
-      toast('Add total pieces (or carbs per piece) so I can calculate.');
+    const f = readForm();
+    const anyPerPiece = MACROS.some((m) => derivePerPiece(f, m) > 0);
+    if (!anyPerPiece) {
+      toast('Add total pieces (or carbs/fat/protein per piece) so I can calculate.');
       els.totalPieces.focus();
     }
     updatePreview();
