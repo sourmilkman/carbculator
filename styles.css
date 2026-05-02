@@ -51,7 +51,7 @@ body {
     var(--bg);
 }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 .app-shell {
   width: min(1080px, 100%);
@@ -368,7 +368,7 @@ h2 { font-size: 1.2rem; line-height: 1.2; }
   font-weight: 750;
 }
 
-input, .search {
+input, select, .search {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -378,7 +378,7 @@ input, .search {
   padding: 10px 12px;
   outline: none;
 }
-input:focus, .search:focus {
+input:focus, select:focus, .search:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(37, 111, 104, 0.18);
 }
