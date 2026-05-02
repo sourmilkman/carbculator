@@ -110,7 +110,9 @@ function calcAllMacros(f) {
 function readForm() {
   const f = {
     barcode: els.barcode.value.trim(),
-    name: els.productName.value.trim(),
+    name: els.productName.selectedIndex > 0
+      ? els.productName.options[els.productName.selectedIndex].textContent.trim()
+      : '',
     grams: Number(els.gramsConsumed.value || 0),
     portionGrams: Number(els.portionGrams.value || 0),
     pieces: Number(els.pieces.value || 0),
@@ -138,7 +140,7 @@ function clearForm() {
 
 function applyProduct(p) {
   if (!p) return;
-  if (p.name) els.productName.value = p.name;
+  if (p.barcode) els.productName.value = p.barcode;
   if (p.portionGrams) els.portionGrams.value = String(p.portionGrams);
   if (p.totalPieces) els.totalPieces.value = String(p.totalPieces);
   MACROS.forEach((m) => {
@@ -148,6 +150,22 @@ function applyProduct(p) {
     });
   });
   updatePreview();
+}
+
+function populateProductDropdown() {
+  const sel = els.productName;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select a product…</option>';
+  Object.values(state.products)
+    .filter((p) => p.name)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .forEach((p) => {
+      const opt = document.createElement('option');
+      opt.value = p.barcode || '';
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    });
+  sel.value = current;
 }
 
 function applyTheme() {
@@ -429,6 +447,7 @@ function renderSuggestions() {
 function renderAll() {
   renderHero();
   renderToday();
+  populateProductDropdown();
   renderLibrary();
   renderHistory();
   renderSuggestions();
@@ -541,7 +560,7 @@ async function handleBarcode(code) {
     els.scanResult.textContent = `Found: ${off.name || 'product'}. Verify and add grams.`;
   } else {
     els.scanResult.textContent = 'New barcode — enter macros manually. It will be saved for next time.';
-    els.productName.focus();
+    els.carbsPer100.focus();
   }
 }
 
@@ -869,6 +888,16 @@ previewInputs.forEach((k) => {
 els.barcode.addEventListener('change', () => {
   const v = els.barcode.value.trim();
   if (v.length >= 6) handleBarcode(v);
+});
+els.productName.addEventListener('change', () => {
+  const barcode = els.productName.value;
+  if (!barcode) return;
+  const p = state.products[barcode];
+  if (p) {
+    els.barcode.value = barcode;
+    applyProduct(p);
+    els.gramsConsumed.focus();
+  }
 });
 document.querySelectorAll('[data-portion]').forEach((b) => {
   b.addEventListener('click', () => {
