@@ -7,6 +7,10 @@ const MACROS = ['carbs', 'fat', 'protein'];
 const MACRO_LABEL = { carbs: 'carbs', fat: 'fat', protein: 'protein' };
 const DEFAULT_LIMITS = { carbs: 30, fat: 165, protein: 100 };
 
+// Calorie split for a strict ketogenic diet.
+const KETO_KCAL_PCT = { carbs: 5, protein: 20, fat: 75 };
+const KCAL_PER_G = { carbs: 4, protein: 4, fat: 9 };
+
 const storedLimits = JSON.parse(localStorage.getItem('macroLimits') || 'null');
 const legacyCarbLimit = Number(localStorage.getItem('carbLimit') || 0);
 
@@ -16,6 +20,7 @@ const state = {
   limits: storedLimits
     ? { ...DEFAULT_LIMITS, ...storedLimits }
     : { ...DEFAULT_LIMITS, ...(legacyCarbLimit ? { carbs: legacyCarbLimit } : {}) },
+  lockRatios: localStorage.getItem('lockRatios') === '1',
   driveFileId: localStorage.getItem('driveFileId') || '',
   theme: localStorage.getItem('carbTheme') || (prefersDark ? 'dark' : 'light'),
   token: '',
@@ -33,6 +38,7 @@ const els = {
   limitLabels: { carbs: $('carbsLimitLabel'), fat: $('fatLimitLabel'), protein: $('proteinLimitLabel') },
   meters: { carbs: $('carbsMeter'), fat: $('fatMeter'), protein: $('proteinMeter') },
   hints: { carbs: $('carbsHint'), fat: $('fatHint'), protein: $('proteinHint') },
+  lockRatios: $('lockRatios'), lockRatiosLabel: $('lockRatiosLabel'),
 
   barcode: $('barcode'), productName: $('productName'),
   gramsConsumed: $('gramsConsumed'),
@@ -644,15 +650,54 @@ MACROS.forEach((m) => {
 applyTheme();
 renderAll();
 
+function rebalanceLimitsFrom(driver) {
+  const driverGrams = state.limits[driver];
+  if (!driverGrams || driverGrams <= 0) return;
+  const totalKcal = (driverGrams * KCAL_PER_G[driver]) / (KETO_KCAL_PCT[driver] / 100);
+  MACROS.forEach((m) => {
+    if (m === driver) return;
+    const grams = Math.round((totalKcal * (KETO_KCAL_PCT[m] / 100)) / KCAL_PER_G[m]);
+    const max = Number(els.limitRanges[m].max) || grams;
+    const clamped = Math.max(0, Math.min(max, grams));
+    state.limits[m] = clamped;
+    els.limitRanges[m].value = String(clamped);
+  });
+}
+
+function applyLockState() {
+  els.lockRatios.checked = state.lockRatios;
+  els.lockRatiosLabel.textContent = state.lockRatios ? 'Keto ratios locked' : 'Lock keto ratios';
+  document.querySelector('.macros')?.classList.toggle('locked', state.lockRatios);
+}
+
 MACROS.forEach((m) => {
   els.limitRanges[m].addEventListener('input', () => {
     state.limits[m] = Number(els.limitRanges[m].value);
+    if (state.lockRatios) rebalanceLimitsFrom(m);
     persist();
     renderHero();
     renderHistory();
     updatePreview();
   });
 });
+
+els.lockRatios.addEventListener('change', () => {
+  state.lockRatios = els.lockRatios.checked;
+  localStorage.setItem('lockRatios', state.lockRatios ? '1' : '0');
+  applyLockState();
+  if (state.lockRatios) {
+    rebalanceLimitsFrom('carbs');
+    persist();
+    renderHero();
+    renderHistory();
+    updatePreview();
+    toast('Keto ratios locked — carbs drive fat & protein.');
+  } else {
+    toast('Ratios unlocked.');
+  }
+});
+
+applyLockState();
 
 els.themeToggle.addEventListener('change', () => {
   state.theme = els.themeToggle.checked ? 'dark' : 'light';
