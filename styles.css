@@ -130,6 +130,45 @@ button, input { font: inherit; }
   font-weight: 800;
 }
 
+.ratio-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  width: fit-content;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.13);
+  color: #edf7f6;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ratio-lock input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+}
+.ratio-lock-track {
+  width: 32px; height: 18px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 180ms ease;
+}
+.ratio-lock-thumb {
+  display: block;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  transition: transform 180ms ease;
+}
+.ratio-lock input:checked + .ratio-lock-track { background: var(--gold); }
+.ratio-lock input:checked + .ratio-lock-track .ratio-lock-thumb { transform: translateX(14px); }
+
+.macros.locked .macro-card { box-shadow: inset 0 0 0 1px rgba(240, 191, 84, 0.35); }
+
 .macro-pills {
   display: flex;
   flex-wrap: wrap;
