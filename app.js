@@ -5,7 +5,7 @@ const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 // Keto macro defaults: ~5% carbs, ~20% protein, ~75% fat of a 2000 kcal/day reference.
 const MACROS = ['carbs', 'fat', 'protein'];
 const MACRO_LABEL = { carbs: 'carbs', fat: 'fat', protein: 'protein' };
-const DEFAULT_LIMITS = { carbs: 30, fat: 165, protein: 100 };
+const DEFAULT_LIMITS = { carbs: 30, fat: 165, protein: 100, calories: 2000 };
 
 // Calorie split for a strict ketogenic diet.
 const KETO_KCAL_PCT = { carbs: 5, protein: 20, fat: 75 };
@@ -32,12 +32,12 @@ const $ = (id) => document.getElementById(id);
 const els = {
   themeToggle: $('themeToggle'), themeToggleLabel: $('themeToggleLabel'),
   // per-macro hero elements
-  totals: { carbs: $('carbsTotal'), fat: $('fatTotal'), protein: $('proteinTotal') },
-  statuses: { carbs: $('carbsStatus'), fat: $('fatStatus'), protein: $('proteinStatus') },
-  limitRanges: { carbs: $('carbsLimitRange'), fat: $('fatLimitRange'), protein: $('proteinLimitRange') },
-  limitLabels: { carbs: $('carbsLimitLabel'), fat: $('fatLimitLabel'), protein: $('proteinLimitLabel') },
-  meters: { carbs: $('carbsMeter'), fat: $('fatMeter'), protein: $('proteinMeter') },
-  hints: { carbs: $('carbsHint'), fat: $('fatHint'), protein: $('proteinHint') },
+  totals:      { carbs: $('carbsTotal'),      fat: $('fatTotal'),      protein: $('proteinTotal'),      calories: $('caloriesTotal') },
+  statuses:    { carbs: $('carbsStatus'),     fat: $('fatStatus'),     protein: $('proteinStatus'),     calories: $('caloriesStatus') },
+  limitRanges: { carbs: $('carbsLimitRange'), fat: $('fatLimitRange'), protein: $('proteinLimitRange'), calories: $('caloriesLimitRange') },
+  limitLabels: { carbs: $('carbsLimitLabel'), fat: $('fatLimitLabel'), protein: $('proteinLimitLabel'), calories: $('caloriesLimitLabel') },
+  meters:      { carbs: $('carbsMeter'),      fat: $('fatMeter'),      protein: $('proteinMeter'),      calories: $('caloriesMeter') },
+  hints:       { carbs: $('carbsHint'),       fat: $('fatHint'),       protein: $('proteinHint'),       calories: $('caloriesHint') },
   lockRatios: $('lockRatios'), lockRatiosLabel: $('lockRatiosLabel'),
 
   barcode: $('barcode'), productName: $('productName'),
@@ -177,8 +177,9 @@ function applyTheme() {
 function updatePreview() {
   const f = readForm();
   const macros = calcAllMacros(f);
+  const kcal = MACROS.reduce((sum, m) => sum + macros[m] * KCAL_PER_G[m], 0);
   const parts = MACROS.map((m) => `${macros[m].toFixed(1)}g ${MACRO_LABEL[m]}`);
-  let txt = `${parts.join(' · ')} for this entry`;
+  let txt = `${parts.join(' · ')} · ${Math.round(kcal)} kcal for this entry`;
 
   const perPieceCarbs = derivePerPiece(f, 'carbs');
   if (perPieceCarbs > 0) {
@@ -196,6 +197,12 @@ function dailyTotal(macro, date = today()) {
   return state.entries
     .filter((e) => e.date === date)
     .reduce((s, e) => s + (Number(e[macro]) || 0), 0);
+}
+
+function dailyCalories(date = today()) {
+  return state.entries
+    .filter((e) => e.date === date)
+    .reduce((s, e) => s + MACROS.reduce((sum, m) => sum + (Number(e[m]) || 0) * KCAL_PER_G[m], 0), 0);
 }
 
 function statusFor(total, limit) {
@@ -232,10 +239,38 @@ function renderHero() {
       card.classList.add(s.cls);
     }
   });
+
+  // Calories (derived from macros)
+  const calTotal = dailyCalories();
+  const calLimit = state.limits.calories;
+  const calRatio = calLimit === 0 ? 1 : calTotal / calLimit;
+  const calMeterPct = calLimit === 0 ? 100 : Math.min(100, Math.max(0, calRatio * 100));
+
+  els.totals.calories.textContent = `${Math.round(calTotal)} kcal`;
+  els.limitLabels.calories.textContent = `${calLimit} kcal`;
+  els.meters.calories.style.width = `${calMeterPct}%`;
+  const calRemaining = calLimit - calTotal;
+  els.hints.calories.textContent = calRemaining >= 0
+    ? `${Math.round(calRemaining)} kcal remaining today`
+    : `${Math.round(Math.abs(calRemaining))} kcal over today`;
+
+  const calS = statusFor(calTotal, calLimit);
+  const calPill = els.statuses.calories;
+  calPill.classList.remove('ok', 'warn', 'bad');
+  calPill.classList.add(calS.cls);
+  calPill.textContent = calS.label;
+
+  const calCard = calPill.closest('.macro-card');
+  if (calCard) {
+    calCard.classList.remove('ok', 'warn', 'bad');
+    calCard.classList.add(calS.cls);
+  }
 }
 
 function entryMacroSummary(entry) {
-  return MACROS.map((m) => `${(Number(entry[m]) || 0).toFixed(1)}g ${MACRO_LABEL[m]}`).join(' · ');
+  const kcal = MACROS.reduce((sum, m) => sum + (Number(entry[m]) || 0) * KCAL_PER_G[m], 0);
+  return MACROS.map((m) => `${(Number(entry[m]) || 0).toFixed(1)}g ${MACRO_LABEL[m]}`).join(' · ') +
+    ` · ${Math.round(kcal)} kcal`;
 }
 
 function renderToday() {
@@ -301,10 +336,15 @@ function renderHistory() {
     return;
   }
   sorted.forEach(([date, totals]) => {
-    const pills = MACROS.map((m) => {
-      const s = statusFor(totals[m], state.limits[m]);
-      return `<span class="status-pill ${s.cls}" title="${MACRO_LABEL[m]}">${MACRO_LABEL[m].charAt(0).toUpperCase()}: ${totals[m].toFixed(1)}g</span>`;
-    }).join('');
+    const calTotal = MACROS.reduce((sum, m) => sum + (totals[m] || 0) * KCAL_PER_G[m], 0);
+    const calS = statusFor(calTotal, state.limits.calories);
+    const pills = [
+      ...MACROS.map((m) => {
+        const s = statusFor(totals[m], state.limits[m]);
+        return `<span class="status-pill ${s.cls}" title="${MACRO_LABEL[m]}">${MACRO_LABEL[m].charAt(0).toUpperCase()}: ${totals[m].toFixed(1)}g</span>`;
+      }),
+      `<span class="status-pill ${calS.cls}" title="calories">kcal: ${Math.round(calTotal)}</span>`,
+    ].join('');
     const li = document.createElement('li');
     li.innerHTML = `
       <div class="entry-main">
@@ -424,9 +464,10 @@ function renderSuggestions() {
   top.forEach((s) => {
     const p = s.product;
     const portionTxt = p.portionGrams ? ` (${(s.grams / p.portionGrams).toFixed(1)} portions)` : '';
+    const contribKcal = MACROS.reduce((sum, m) => sum + s.contribution[m] * KCAL_PER_G[m], 0);
     const contribTxt = MACROS
       .map((m) => `+${s.contribution[m].toFixed(1)}g ${MACRO_LABEL[m]}`)
-      .join(' · ');
+      .join(' · ') + ` · ${Math.round(contribKcal)} kcal`;
     const purityBadge = lack && s.purity >= 0.5
       ? ` <span class="purity-badge">${Math.round(s.purity * 100)}% ${MACRO_LABEL[lack]}</span>`
       : '';
@@ -503,7 +544,8 @@ function addEntry() {
   persist();
   renderAll();
   clearForm();
-  toast(`Added ${macros.carbs.toFixed(1)}g carbs · ${macros.fat.toFixed(1)}g fat · ${macros.protein.toFixed(1)}g protein`);
+  const kcal = MACROS.reduce((sum, m) => sum + macros[m] * KCAL_PER_G[m], 0);
+  toast(`Added ${macros.carbs.toFixed(1)}g carbs · ${macros.fat.toFixed(1)}g fat · ${macros.protein.toFixed(1)}g protein · ${Math.round(kcal)} kcal`);
   scheduleSync();
 }
 
@@ -740,6 +782,7 @@ async function pullFromDrive(token, fileId) {
       MACROS.forEach((m) => {
         if (els.limitRanges[m]) els.limitRanges[m].value = String(state.limits[m]);
       });
+      if (els.limitRanges.calories) els.limitRanges.calories.value = String(state.limits.calories);
     }
     persist();
   } catch { /* ignore */ }
@@ -796,6 +839,7 @@ function setActiveTab(name) {
 MACROS.forEach((m) => {
   els.limitRanges[m].value = String(state.limits[m]);
 });
+els.limitRanges.calories.value = String(state.limits.calories);
 applyTheme();
 renderAll();
 
@@ -828,6 +872,13 @@ MACROS.forEach((m) => {
     renderHistory();
     updatePreview();
   });
+});
+
+els.limitRanges.calories.addEventListener('input', () => {
+  state.limits.calories = Number(els.limitRanges.calories.value);
+  persist();
+  renderHero();
+  renderHistory();
 });
 
 els.lockRatios.addEventListener('change', () => {

@@ -81,6 +81,21 @@
             <div class="meter" aria-hidden="true"><span id="proteinMeter"></span></div>
             <p id="proteinHint" class="limit-hint">100g remaining today</p>
           </div>
+
+          <div class="macro-card" data-macro="calories">
+            <div class="macro-head">
+              <p class="macro-name">Calories</p>
+              <p id="caloriesStatus" class="status-pill">Within limit</p>
+            </div>
+            <h2 id="caloriesTotal" class="macro-total">0 kcal</h2>
+            <div class="limit-heading">
+              <label for="caloriesLimitRange">Daily limit</label>
+              <strong id="caloriesLimitLabel">2000 kcal</strong>
+            </div>
+            <input id="caloriesLimitRange" type="range" min="500" max="5000" step="50" value="2000" />
+            <div class="meter" aria-hidden="true"><span id="caloriesMeter"></span></div>
+            <p id="caloriesHint" class="limit-hint">2000 kcal remaining today</p>
+          </div>
         </div>
       </header>
 
@@ -209,7 +224,7 @@
           <button class="chip" type="button" data-pieces="10">10 pieces</button>
         </div>
 
-        <p id="carbPreview" class="preview">0.0g carbs · 0.0g fat · 0.0g protein for this entry</p>
+        <p id="carbPreview" class="preview">0.0g carbs · 0.0g fat · 0.0g protein · 0 kcal for this entry</p>
 
         <div class="action-row">
           <button id="saveProduct" class="btn ghost" type="button">Save to library only</button>
