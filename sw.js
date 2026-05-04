@@ -1,4 +1,4 @@
-const CACHE = 'carbculator-v10';
+const CACHE = 'carbculator-v13';
 const ASSETS = [
   './',
   'index.html',
